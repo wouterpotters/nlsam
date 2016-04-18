@@ -69,7 +69,7 @@ def sh_smooth(data, gtab, sh_order=4, similarity_threshold=50):
         # If it's not a b0, check if enough data for requested sh order
         if np.sum(idx) < (sh_order + 1) * (sh_order + 2) / 2:
             warn("bval {} has not enough values for sh order {}." \
-                "\nPutting back the original values.".format(unique_bval, sh_order))
+                 "\nPutting back the original values.".format(unique_bval, sh_order))
             pred_sig[..., idx] = data[..., idx]
             continue
 
