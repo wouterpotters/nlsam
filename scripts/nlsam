@@ -105,8 +105,7 @@ def main():
     param_alpha = {}
 
     if len(block_size) != len(data.shape):
-        raise ValueError('Block shape and data shape are not of the same \
-                         dimensions', data.shape, block_size.shape)
+        raise ValueError('Block shape and data shape are not of the same dimensions', data.shape, block_size.shape)
 
     if args.cores is None:
         param_D['numThreads'] = cpu_count()
@@ -125,6 +124,10 @@ def main():
 
     if data.shape[:-1] != mask.shape:
         raise ValueError('data shape is {}, but mask shape {} is different!'.format(data.shape, mask.shape))
+
+    data = data[:, 50:60]
+    mask = mask[:, 50:60]
+    sigma = sigma[:, 50:60]
 
     bvals, bvecs = read_bvals_bvecs(args.bvals, args.bvecs)
 

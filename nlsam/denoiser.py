@@ -117,10 +117,10 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     # param_alpha['L'] = int(0.5 * X.shape[0])
 
     D = param_alpha['D']
-    del param_alpha['D']
+    # del param_alpha['D']
 
     alpha = np.empty((D.shape[1], X.shape[1]))
-    alpha_prev = csc_matrix((D.shape[1], 1))
+    # alpha_prev = csc_matrix((D.shape[1], 1))
     # W = np.ones(alpha.shape, dtype=dtype, order='F')
 
     # DtD = np.dot(D.T, D)
@@ -132,9 +132,9 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
 
     # xi = np.random.randn(X.shape[0], X.shape[1]) * var_mat
     # eps = np.max(np.abs(np.dot(D.T, xi)), axis=0)
-    param_alpha['mode'] = 1
+    param_alpha['mode'] = 2
     param_alpha['pos'] = True
-    del param_alpha['pos']
+    # del param_alpha['pos']
 
     # for _ in range(n_iter):
     # not_converged = np.equal(has_converged, False)
@@ -154,11 +154,11 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         # lbda * alpha.abs().sum()
 
         # print(np.sum((X - np.dot(D, alpha))**2).shape, )
-        return np.sum((X - D.dot(alpha))**2).squeeze() + lbda * np.abs(alpha).sum()
+        return 0.5 * np.sum((X - D.dot(alpha))**2).squeeze() + lbda * np.abs(alpha).sum()
 
     prev_obj = 1e300
     lambda_max = np.abs(np.dot(D.T, X)).max(axis=1)
-    log_grid = np.logspace(0.01, 0.95, num=100)
+    log_grid = np.logspace(0.01, 0.95, num=10)
     # alpha_prev = csc_matrix((D.shape[1], X.shape[1]))
 
     for idx in range(lambda_max.shape[0]):
@@ -166,10 +166,10 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         lgrid = log_grid * lambda_max[idx]
 
         for lbda in lgrid:
-
+            # print(lbda, lambda_max)
             param_alpha['lambda1'] = lbda
-            alpha_zero = spams.cd(X[:, idx:idx + 1], D, alpha_prev, **param_alpha)
-            alpha_prev = alpha_zero
+            alpha_zero = spams.lasso(X[:, idx:idx + 1], **param_alpha)
+            # alpha_prev = alpha_zero
 
             obj = obj_func(X[:, idx:idx + 1], D, alpha_zero, lbda)
             # print(obj.shape)
@@ -195,7 +195,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     # alpha = arr
     # X = D.dot(alpha)
     # X = sparse_dot(D,alpha)
-    param_alpha['D'] = D
+    # param_alpha['D'] = D
     X = np.dot(D, alpha)
     weigths = np.ones(X_full_shape[1], dtype=dtype, order='F')
     weigths[train_idx] = 1. / ((alpha != 0).sum(axis=0) + 1.)
@@ -208,6 +208,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
 
 def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10,
             mask=None, dtype=np.float64):
+
 
     # no overlapping blocks for training
     no_over = (0, 0, 0, 0)
