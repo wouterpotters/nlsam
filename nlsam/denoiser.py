@@ -8,8 +8,8 @@ from itertools import repeat
 # from functools import partial
 from multiprocessing import Pool
 
-from nlsam.utils import im2col_nd, col2im_nd, sparse_dot
-from scipy.sparse import lil_matrix
+from nlsam.utils import im2col_nd, col2im_nd
+from scipy.sparse import lil_matrix, csc_matrix
 
 warnings.simplefilter("ignore", category=FutureWarning)
 
@@ -103,66 +103,102 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
 
     orig_shape = data.shape
     mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
-    train_idx = np.sum(mask_array, axis=0) > mask_array.shape[0]/2
+    train_idx = np.sum(mask_array, axis=0) > mask_array.shape[0] / 2
 
     # If mask is empty, return a bunch of zeros as blocks
     if not np.any(train_idx):
         return np.zeros_like(data)
 
     X = im2col_nd(data, block_size, overlap)
-    var_mat = np.median(im2col_nd(variance[..., 0:orig_shape[-1]], block_size, overlap)[:, train_idx], axis=0).astype(dtype)
+    # var_mat = np.median(im2col_nd(variance[..., 0:orig_shape[-1]], block_size, overlap)[:, train_idx], axis=0).astype(dtype)
     X_full_shape = X.shape
     X = X[:, train_idx]
 
-    param_alpha['L'] = int(0.5 * X.shape[0])
+    # param_alpha['L'] = int(0.5 * X.shape[0])
 
     D = param_alpha['D']
+    del param_alpha['D']
 
-    alpha = lil_matrix((D.shape[1], X.shape[1]))
-    W = np.ones(alpha.shape, dtype=dtype, order='F')
+    alpha = np.empty((D.shape[1], X.shape[1]))
+    alpha_prev = csc_matrix((D.shape[1], 1))
+    # W = np.ones(alpha.shape, dtype=dtype, order='F')
 
-    DtD = np.dot(D.T, D)
-    DtX = np.dot(D.T, X)
-    DtXW = np.empty_like(DtX, order='F')
+    # DtD = np.dot(D.T, D)
+    # DtX = np.dot(D.T, X)
+    # DtXW = np.empty_like(DtX, order='F')
 
-    alpha_old = np.ones(alpha.shape, dtype=dtype)
-    has_converged = np.zeros(alpha.shape[1], dtype=np.bool)
+    # alpha_old = np.ones(alpha.shape, dtype=dtype)
+    # has_converged = np.zeros(alpha.shape[1], dtype=np.bool)
 
-    xi = np.random.randn(X.shape[0], X.shape[1]) * var_mat
-    eps = np.max(np.abs(np.dot(D.T, xi)), axis=0)
+    # xi = np.random.randn(X.shape[0], X.shape[1]) * var_mat
+    # eps = np.max(np.abs(np.dot(D.T, xi)), axis=0)
     param_alpha['mode'] = 1
     param_alpha['pos'] = True
+    del param_alpha['pos']
 
-    for _ in range(n_iter):
-        not_converged = np.equal(has_converged, False)
-        DtXW[:, not_converged] = DtX[:, not_converged] / W[:, not_converged]
+    # for _ in range(n_iter):
+    # not_converged = np.equal(has_converged, False)
+    # DtXW[:, not_converged] = DtX[:, not_converged] / W[:, not_converged]
 
-        for i in range(alpha.shape[1]):
-            if not has_converged[i]:
+    # for i in range(alpha.shape[1]):
+        # if not has_converged[i]:
 
-                param_alpha['lambda1'] = var_mat[i] * (X.shape[0] + gamma * np.sqrt(2 * X.shape[0]))
-                DtDW = (1. / W[..., None, i]) * DtD * (1. / W[:, i])
-                alpha[:, i:i+1] = spams.lasso(X[:, i:i+1], Q=np.asfortranarray(DtDW), q=DtXW[:, i:i+1], **param_alpha)
+    def obj_func(X, D, alpha, lbda):
+        alpha = alpha.toarray()
+        # print(X.shape, D.shape, alpha.shape, lbda, np.dot(D, alpha).shape, type(X - np.dot(D, alpha)))
+        # print(type(X), type(D), type(alpha), type(lbda))
+        # print(type(X - D.dot(alpha)))
+        # np.asarray((X - np.dot(D, alpha)))**2
+        # print(((X - np.dot(D, alpha))**2).shape)
+        # np.sum((X - np.dot(D, alpha))**2)
+        # lbda * alpha.abs().sum()
 
-        arr = alpha.toarray()
-        nonzero_ind = arr != 0
-        arr[nonzero_ind] /= W[nonzero_ind]
-        has_converged = np.max(np.abs(alpha_old - arr), axis=0) < 1e-5
+        # print(np.sum((X - np.dot(D, alpha))**2).shape, )
+        return np.sum((X - D.dot(alpha))**2).squeeze() + lbda * np.abs(alpha).sum()
 
-        if np.all(has_converged):
-            break
+    prev_obj = 1e300
+    lambda_max = np.abs(np.dot(D.T, X)).max(axis=1)
+    log_grid = np.logspace(0.01, 0.95, num=100)
+    # alpha_prev = csc_matrix((D.shape[1], X.shape[1]))
 
-        alpha_old = arr
-        W[:] = 1. / (np.abs(alpha_old**tau) + eps)
+    for idx in range(lambda_max.shape[0]):
+
+        lgrid = log_grid * lambda_max[idx]
+
+        for lbda in lgrid:
+
+            param_alpha['lambda1'] = lbda
+            alpha_zero = spams.cd(X[:, idx:idx + 1], D, alpha_prev, **param_alpha)
+            alpha_prev = alpha_zero
+
+            obj = obj_func(X[:, idx:idx + 1], D, alpha_zero, lbda)
+            # print(obj.shape)
+            if obj < prev_obj:
+                best_alpha = alpha_zero
+                prev_obj = obj
+
+        alpha[:, idx:idx+1] = best_alpha.toarray()
+
+    # arr = alpha.toarray()
+    # nonzero_ind = arr != 0
+    # arr[nonzero_ind] /= W[nonzero_ind]
+    # has_converged = np.max(np.abs(alpha_old - arr), axis=0) < 1e-5
+
+    # if np.all(has_converged):
+    #     break
+
+    # alpha_old = arr
+    # W[:] = 1. / (np.abs(alpha_old**tau) + eps)
 
         # compute_weights(alpha_old, alpha, W, tau, eps)
 
     # alpha = arr
     # X = D.dot(alpha)
     # X = sparse_dot(D,alpha)
-    X = np.dot(D, arr)
+    param_alpha['D'] = D
+    X = np.dot(D, alpha)
     weigths = np.ones(X_full_shape[1], dtype=dtype, order='F')
-    weigths[train_idx] = 1. / (alpha.getnnz(axis=0) + 1.)
+    weigths[train_idx] = 1. / ((alpha != 0).sum(axis=0) + 1.)
 
     X2 = np.zeros(X_full_shape, dtype=dtype, order='F')
     X2[:, train_idx] = X
