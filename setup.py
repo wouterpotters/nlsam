@@ -2,7 +2,8 @@
 
 params = {}
 params['modlist'] = ['nlsam.utils',
-                     'nlsam.stabilizer']
+                     'nlsam.stabilizer',
+                     'nlsam.coordinate_descent']
 params['scripts'] = ['scripts/stabilizer',
                      'scripts/nlsam']
 params['name'] = 'nlsam'

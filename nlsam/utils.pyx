@@ -7,7 +7,7 @@ cimport numpy as np
 cimport cython
 
 from numpy.lib.stride_tricks import as_strided as ast
-from scipy.sparse import issparse
+from scipy.sparse import issparse, csc_matrix
 
 def sparse_dot(a, b, order='F', dense_output=True):
     if issparse(a) or issparse(b):
@@ -17,6 +17,16 @@ def sparse_dot(a, b, order='F', dense_output=True):
         return ret
     else:
         return np.dot(a, b)
+
+
+def sparse_dot_to_array(a, b):
+
+    if issparse(b):
+        return csc_matrix(a).dot(b).toarray()
+
+    return a.dot(b)
+    # raise ValueError('One input matrix is not sparse.'
+    #                  ' a is sparse : {}, b is sparse {}: '.format(issparse(a), issparse(b)))
 
 
 cdef void _im2col3D(double[::1,:,:] A, double[::1,:] R, int[:] size) nogil:
