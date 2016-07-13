@@ -11,6 +11,11 @@ cimport numpy as np
 
 from dipy.core.ndindex import ndindex
 from scipy.special import erfinv
+# from scipy.special import _ufuncs
+# from scipy.special._ufuncs cimport erfinv
+# cdef extern double cephes_ndtri(double) nogil
+# cdef extern from "scipy.special._ufuncs":
+#     cdef double _func_ndtri "ndtri"(double) nogil
 
 from nibabel.optpkg import optional_package
 cython_gsl, have_cython_gsl, _ = optional_package("cython_gsl")

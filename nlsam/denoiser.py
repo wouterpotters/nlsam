@@ -14,6 +14,7 @@ from scipy.sparse import lil_matrix, csc_matrix, issparse
 from glmnet import ElasticNet, CVGlmNet
 from sklearn.linear_model import lasso_path, LassoLarsIC, lars_path
 from nlsam.coordinate_descent import enet_coordinate_descent_gram as lasso_cd
+from nlsam.enet import elastic_net_path, select_best_path
 
 warnings.simplefilter("ignore", category=FutureWarning)
 
@@ -279,7 +280,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
 
                 for i, lbda in enumerate(lgrid):
                     param_alpha['lambda1'] = lbda
-                    spams.lasso(X, Q=Q, q=q, cholesky=True, **param_alpha).toarray(out=alphas[..., i])
+                    spams.lasso(X, Q=Q, q=q, cholesky=False, **param_alpha).toarray(out=alphas[..., i])
 
                 obj = obj_df(X, D, alphas, var_mat, criterion='aic')
                 best_idx = np.argmin(obj, axis=1)

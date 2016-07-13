@@ -6,12 +6,15 @@
 # Stripped out + heavily modifed version of
 # https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/cd_fast.pyx
 
+from itertools import product
+
 from libc.math cimport fabs
 cimport numpy as np
 import numpy as np
 
 cimport cython
-from cpython cimport bool
+# from libcpp cimport bint
+from cython.parallel import prange
 
 ctypedef np.float64_t DOUBLE
 ctypedef np.uint32_t UINT32_t
@@ -20,24 +23,24 @@ np.import_array()
 
 # The following two functions are shamelessly copied from the tree code.
 
-cdef enum:
-    # Max value for our rand_r replacement (near the bottom).
-    # We don't use RAND_MAX because it's different across platforms and
-    # particularly tiny on Windows/MSVC.
-    RAND_R_MAX = 0x7FFFFFFF
+# cdef enum:
+#     # Max value for our rand_r replacement (near the bottom).
+#     # We don't use RAND_MAX because it's different across platforms and
+#     # particularly tiny on Windows/MSVC.
+#     RAND_R_MAX = 0x7FFFFFFF
 
 
-cdef inline UINT32_t our_rand_r(UINT32_t* seed) nogil:
-    seed[0] ^= <UINT32_t>(seed[0] << 13)
-    seed[0] ^= <UINT32_t>(seed[0] >> 17)
-    seed[0] ^= <UINT32_t>(seed[0] << 5)
+# cdef inline UINT32_t our_rand_r(UINT32_t* seed) nogil:
+#     seed[0] ^= <UINT32_t>(seed[0] << 13)
+#     seed[0] ^= <UINT32_t>(seed[0] >> 17)
+#     seed[0] ^= <UINT32_t>(seed[0] << 5)
 
-    return seed[0] % (<UINT32_t>RAND_R_MAX + 1)
+#     return seed[0] % (<UINT32_t>RAND_R_MAX + 1)
 
 
-cdef inline UINT32_t rand_int(UINT32_t end, UINT32_t* random_state) nogil:
-    """Generate a random integer in [0; end)."""
-    return our_rand_r(random_state) % end
+# cdef inline UINT32_t rand_int(UINT32_t end, UINT32_t* random_state) nogil:
+#     """Generate a random integer in [0; end)."""
+#     return our_rand_r(random_state) % end
 
 
 cdef inline double fmax(double x, double y) nogil:
@@ -79,16 +82,16 @@ cdef double max(int n, double* a) nogil:
     return m
 
 
-cdef double diff_abs_max(int n, double* a, double* b) nogil:
-    """np.max(np.abs(a - b))"""
-    cdef int i
-    cdef double m = fabs(a[0] - b[0])
-    cdef double d
-    for i in range(1, n):
-        d = fabs(a[i] - b[i])
-        if d > m:
-            m = d
-    return m
+# cdef double diff_abs_max(int n, double* a, double* b) nogil:
+#     """np.max(np.abs(a - b))"""
+#     cdef int i
+#     cdef double m = fabs(a[0] - b[0])
+#     cdef double d
+#     for i in range(1, n):
+#         d = fabs(a[i] - b[i])
+#         if d > m:
+#             m = d
+#     return m
 
 
 cdef extern from "cblas.h":
@@ -118,168 +121,11 @@ cdef extern from "cblas.h":
     void dscal "cblas_dscal"(int N, double alpha, double *X, int incX) nogil
 
 
-# def enet_coordinate_descent(np.ndarray[DOUBLE, ndim=1] w,
-#                             double alpha, double beta,
-#                             np.ndarray[DOUBLE, ndim=2, mode='fortran'] X,
-#                             np.ndarray[DOUBLE, ndim=1, mode='c'] y,
-#                             int max_iter, double tol,
-#                             object rng, bint random=0, bint positive=0):
-#     """Cython version of the coordinate descent algorithm
-#         for Elastic-Net regression
-
-#         We minimize
-
-#         (1/2) * norm(y - X w, 2)^2 + alpha norm(w, 1) + (beta/2) norm(w, 2)^2
-
-#     """
-
-#     # get the data information into easy vars
-#     cdef unsigned int n_samples = X.shape[0]
-#     cdef unsigned int n_features = X.shape[1]
-
-#     # get the number of tasks indirectly, using strides
-#     cdef unsigned int n_tasks = y.strides[0] / sizeof(DOUBLE)
-
-#     # compute norms of the columns of X
-#     cdef np.ndarray[DOUBLE, ndim=1] norm_cols_X = (X**2).sum(axis=0)
-
-#     # initial value of the residuals
-#     cdef np.ndarray[DOUBLE, ndim=1] R = np.empty(n_samples)
-
-#     cdef np.ndarray[DOUBLE, ndim=1] XtA = np.empty(n_features)
-#     cdef double tmp
-#     cdef double w_ii
-#     cdef double d_w_max
-#     cdef double w_max
-#     cdef double d_w_ii
-#     cdef double gap = tol + 1.0
-#     cdef double d_w_tol = tol
-#     cdef double dual_norm_XtA
-#     cdef double R_norm2
-#     cdef double w_norm2
-#     cdef double l1_norm
-#     cdef unsigned int ii
-#     cdef unsigned int i
-#     cdef unsigned int n_iter = 0
-#     cdef unsigned int f_iter
-#     cdef UINT32_t rand_r_state_seed = rng.randint(0, RAND_R_MAX)
-#     cdef UINT32_t* rand_r_state = &rand_r_state_seed
-
-#     with nogil:
-#         # R = y - np.dot(X, w)
-#         for i in range(n_samples):
-#             R[i] = y[i] - ddot(n_features,
-#                                <DOUBLE*>(X.data + i * sizeof(DOUBLE)),
-#                                n_samples, <DOUBLE*>w.data, 1)
-
-#         # tol *= np.dot(y, y)
-#         tol *= ddot(n_samples, <DOUBLE*>y.data, n_tasks,
-#                     <DOUBLE*>y.data, n_tasks)
-
-#         for n_iter in range(max_iter):
-#             w_max = 0.0
-#             d_w_max = 0.0
-#             for f_iter in range(n_features):  # Loop over coordinates
-#                 if random:
-#                     ii = rand_int(n_features, rand_r_state)
-#                 else:
-#                     ii = f_iter
-
-#                 if norm_cols_X[ii] == 0.0:
-#                     continue
-
-#                 w_ii = w[ii]  # Store previous value
-
-#                 if w_ii != 0.0:
-#                     # R += w_ii * X[:,ii]
-#                     daxpy(n_samples, w_ii,
-#                           <DOUBLE*>(X.data + ii * n_samples * sizeof(DOUBLE)),
-#                           1, <DOUBLE*>R.data, 1)
-
-#                 # tmp = (X[:,ii]*R).sum()
-#                 tmp = ddot(n_samples,
-#                            <DOUBLE*>(X.data + ii * n_samples * sizeof(DOUBLE)),
-#                            1, <DOUBLE*>R.data, 1)
-
-#                 if positive and tmp < 0:
-#                     w[ii] = 0.0
-#                 else:
-#                     w[ii] = (fsign(tmp) * fmax(fabs(tmp) - alpha, 0)
-#                              / (norm_cols_X[ii] + beta))
-
-#                 if w[ii] != 0.0:
-#                     # R -=  w[ii] * X[:,ii] # Update residual
-#                     daxpy(n_samples, -w[ii],
-#                           <DOUBLE*>(X.data + ii * n_samples * sizeof(DOUBLE)),
-#                           1, <DOUBLE*>R.data, 1)
-
-#                 # update the maximum absolute coefficient update
-#                 d_w_ii = fabs(w[ii] - w_ii)
-#                 if d_w_ii > d_w_max:
-#                     d_w_max = d_w_ii
-
-#                 if fabs(w[ii]) > w_max:
-#                     w_max = fabs(w[ii])
-
-#             if (w_max == 0.0
-#                     or d_w_max / w_max < d_w_tol
-#                     or n_iter == max_iter - 1):
-#                 # the biggest coordinate update of this iteration was smaller
-#                 # than the tolerance: check the duality gap as ultimate
-#                 # stopping criterion
-
-#                 # XtA = np.dot(X.T, R) - beta * w
-#                 for i in range(n_features):
-#                     XtA[i] = ddot(
-#                         n_samples,
-#                         <DOUBLE*>(X.data + i * n_samples *sizeof(DOUBLE)),
-#                         1, <DOUBLE*>R.data, 1) - beta * w[i]
-
-#                 if positive:
-#                     dual_norm_XtA = max(n_features, <DOUBLE*>XtA.data)
-#                 else:
-#                     dual_norm_XtA = abs_max(n_features, <DOUBLE*>XtA.data)
-
-#                 # R_norm2 = np.dot(R, R)
-#                 R_norm2 = ddot(n_samples, <DOUBLE*>R.data, 1,
-#                                <DOUBLE*>R.data, 1)
-
-#                 # w_norm2 = np.dot(w, w)
-#                 w_norm2 = ddot(n_features, <DOUBLE*>w.data, 1,
-#                                <DOUBLE*>w.data, 1)
-
-#                 if (dual_norm_XtA > alpha):
-#                     const = alpha / dual_norm_XtA
-#                     A_norm2 = R_norm2 * (const ** 2)
-#                     gap = 0.5 * (R_norm2 + A_norm2)
-#                 else:
-#                     const = 1.0
-#                     gap = R_norm2
-
-#                 l1_norm = dasum(n_features, <DOUBLE*>w.data, 1)
-
-#                 # np.dot(R.T, y)
-#                 gap += (alpha * l1_norm - const * ddot(
-#                             n_samples,
-#                             <DOUBLE*>R.data, 1,
-#                             <DOUBLE*>y.data, n_tasks)
-#                         + 0.5 * beta * (1 + const ** 2) * (w_norm2))
-
-#                 if gap < tol:
-#                     # return if we reached desired tolerance
-#                     break
-
-#     return w, gap, tol, n_iter + 1
-
-
-
-def enet_coordinate_descent_gram(double[:] w, double alpha, double beta,
-                                 np.ndarray[double, ndim=2, mode='c'] Q,
-                                 np.ndarray[double, ndim=1, mode='c'] q,
-                                 np.ndarray[double, ndim=1] y,
-                                 int max_iter, double tol, bint positive=0):
-                                 # object rng,
-                                 # bint random=0, bint positive=0):
+cdef double[:] enet_coordinate_descent_gram(double[:] w, double alpha, double beta,
+                                 double[:, :] Q,
+                                 double[:] q,
+                                 double[:] y,
+                                 int max_iter=500, double tol=1e-4, bint positive=1):
     """Cython version of the coordinate descent algorithm
         for Elastic-Net regression
 
@@ -317,9 +163,10 @@ def enet_coordinate_descent_gram(double[:] w, double alpha, double beta,
     cdef double y_norm2 = np.dot(y, y)
     cdef double* w_ptr = <double*>&w[0]
     cdef double* Q_ptr = &Q[0, 0]
-    cdef double* q_ptr = <double*>q.data
+    cdef double* q_ptr = <double*>&q[0]
     cdef double* H_ptr = &H[0]
     cdef double* XtA_ptr = &XtA[0]
+
     tol = tol * y_norm2
 
     with nogil:
@@ -405,5 +252,108 @@ def enet_coordinate_descent_gram(double[:] w, double alpha, double beta,
                     # return if we reached desired tolerance
                     break
 
-    return np.asarray(w)
+    # return np.asarray(w)
+        return w
 
+
+def lasso_cd(double[:, :] X, double[:, :] D, bint positive=True, int n_lambdas=100, int max_iter=500, double tol=1e-4):
+    cdef:
+        int n = X.shape[1]
+        int n_samples = X.shape[0]
+        int i
+        double eps=1e-3
+        double l1_reg
+        double l2_reg = 0.
+
+        double[:, :] q = np.dot(D.T, X)
+        double[:, :] Q = np.dot(D.T, D)
+        double[:, :] coefs = np.zeros((D.shape[1], X.shape[1]), dtype=np.float64)
+
+        # double[:] lambda_max = np.max(np.abs(q), axis=1)
+        # double[:] grid = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=n_lambdas)[::-1]
+    lbda=0
+    l1_ratio=0
+    for i, j in product(range(n), range(n_lambdas)):
+        l1_reg = lbda * l1_ratio * n_samples
+        # l2_reg = lbda * (1.0 - l1_ratio) * n_samples
+        coefs[:, i] = enet_coordinate_descent_gram(coefs[:, i], l1_reg, l2_reg, Q, q[:, i], X[:, i], max_iter, tol, positive)
+
+    return coefs
+
+import _glmnet
+# from _glmnet cimport elnet
+
+def wrap_glmnet(double rho,
+                double[:, ::1] X,
+                double[:, ::1] y,
+                double[:] weights,
+                double[:] jd,
+                double[:] vp,
+                double[:, :] box_constraints,
+                double flmin=0.001 ,
+                double ulam=2,
+                double thr=1.0e-4,
+                int nlam=100,
+                bint isd=0,
+                int maxit=500):
+    """
+    Raw-output wrapper for elastic net linear regression.
+    """
+    cdef:
+        # Flags determining overwrite behavior
+        bint overwrite_pred_ok = False
+        bint overwrite_targ_ok = False
+
+        int nx = X.shape[1]
+        int ny = y.shape[1]
+        int memlimit = X.shape[1]
+        int idx
+
+        # int nlam=100
+        # int isd=False
+        # int maxit=500
+        int jerr, nlp
+        double lmu, rsq
+        np.ndarray[double, ndim=1] a0_ = np.zeros(nlam, dtype=np.float64)
+        # double [:,:] a0_ = np.zeros(nx, dtype=np.float64)
+        np.ndarray[double, ndim=2] ca_ = np.zeros((nx, nlam), dtype=np.float64)
+        np.ndarray[int, ndim=1] ia = np.zeros(nx, dtype=np.int32)
+        np.ndarray[int, ndim=1] nin_ = np.zeros(nlam, dtype=np.int32)
+        np.ndarray[double, ndim=1] alm_ = np.zeros(nlam, dtype=np.float64)
+        # double[:] lmu = np.zeros(ny)
+        # double[:] arr = np.zeros(ny)
+        np.ndarray[double, ndim=2] intercepts = np.zeros((nlam, ny))
+        np.ndarray[double, ndim=3] alphas = np.zeros((nx, nlam, ny))
+        np.ndarray[double, ndim=2] lambdas = np.zeros((nlam, ny))
+
+        np.ndarray[int, ndim=2] indices = np.zeros((nx, ny), dtype=np.int32)
+        np.ndarray[int, ndim=2] df = np.zeros((nlam, ny), dtype=np.int32)
+    # rsq = np.zeros((nlam, ny))
+
+
+    # out=0
+
+    # Call the Fortran wrapper.
+    for idx in range(ny):
+        # lmu, a0_, ca_, ia, nin_, rsq, alm_, nlp, jerr =  \
+        out =  \
+                _glmnet.elnet(rho, X, y[:, idx], weights, jd, vp, box_constraints,
+                              memlimit, flmin, ulam, thr, nlam=nlam, isd=isd, maxit=maxit)
+
+        # print(type(a0_), type(ca_), type(alm_))
+        # print(a0_.shape, ca_.shape, alm_.shape)
+        # print(a0_.shape, ca_.shape, nin_.shape, alm_.shape, indices.shape, ia.shape, X.shape, y.shape)
+        # print(idx, indices.shape, ia.shape)
+        intercepts[:,idx] = a0_
+        df[:,idx] = nin_
+        lambdas[:,idx] = alm_
+        indices[:,idx] = ia - 1
+        alphas[:,:,idx] = ca_[indices[:, idx]]
+
+
+        # out =  \
+        #         _glmnet.elnet(rho, X, y[:, idx], weights, jd, vp, box_constraints,
+        #                       memlimit, flmin, ulam, thr, nlam=nlam, isd=isd, maxit=maxit)
+
+    # return lmu, intercepts, alphas, ia, nin, rsq, lambdas, nlp, jerr
+    return intercepts, alphas, indices, lambdas, df
