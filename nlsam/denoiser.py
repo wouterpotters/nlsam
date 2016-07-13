@@ -208,8 +208,14 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     custom_path = True
     sklearn_path = True
     admm = False
+    sam_path = True
 
-    if admm:
+    if sam_path:
+        lambdas, alphas, intercepts = lasso_path(D, X)
+        alpha = select_best_path(D, X, alphas, intercepts, var_mat, criterion='aic')
+        X = np.dot(D, alpha)
+
+    elif admm:
 
         from sporco.admm import bpdn
 
