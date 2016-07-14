@@ -12,9 +12,10 @@ from nlsam.utils import im2col_nd, col2im_nd, sparse_dot_to_array
 from scipy.sparse import lil_matrix, csc_matrix, issparse
 
 from glmnet import ElasticNet, CVGlmNet
-from sklearn.linear_model import lasso_path, LassoLarsIC, lars_path
-from nlsam.coordinate_descent import enet_coordinate_descent_gram as lasso_cd
-from nlsam.enet import elastic_net_path, select_best_path
+# from sklearn.linear_model import lasso_path, LassoLarsIC, lars_path
+from sklearn.linear_model import lasso_path as sk_lasso_path
+from nlsam.coordinate_descent import lasso_cd
+from nlsam.enet import lasso_path, select_best_path
 
 warnings.simplefilter("ignore", category=FutureWarning)
 
@@ -126,7 +127,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     D = param_alpha['D']
     # del param_alpha['D']
 
-    alpha = np.empty((D.shape[1], X.shape[1]))
+    alpha = np.zeros((D.shape[1], X.shape[1]))
     # alpha_prev = csc_matrix((D.shape[1], 1))
     # W = np.ones(alpha.shape, dtype=dtype, order='F')
 
@@ -211,9 +212,32 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     sam_path = True
 
     if sam_path:
-        lambdas, alphas, intercepts = lasso_path(D, X)
-        alpha = select_best_path(D, X, alphas, intercepts, var_mat, criterion='aic')
-        X = np.dot(D, alpha)
+        # X = np.asfortranarray(X / np.tile(np.sqrt((X*X).sum(axis=0)),(X.shape[0],1)),dtype=np.float64)
+        # D = np.asfortranarray(D / np.tile(np.sqrt((D*D).sum(axis=0)),(D.shape[0],1)),dtype=np.float64)
+        # alpha = np.zeros((D.shape[1], X.shape[1]))
+        # for i in range(X.shape[1]):
+            # out = lasso_path(D, X[:, i], lambdas=[0.15])
+            # X[:, i] = lasso_path(D, X[:, i], lambdas=[0.15]).squeeze()
+            # alpha[:, i] = out[1].squeeze()
+            # print(np.sum(alpha[:, i] !=0))
+        lambdas, alpha, intercepts, predict = lasso_path(D, X, lambdas=[0.0015])
+        print(lambdas.shape, alpha.shape, intercepts.shape, predict.shape)
+        # alphas = np.zeros((D.shape[1], X.shape[1], 100))
+        # for idx in range(X.shape[1]):
+        #     _, alphas[:,idx], _ = sk_lasso_path(D, X[:, idx])
+
+        # var_mat = np.ones_like(var_mat)
+        # intercepts = np.zeros((D.shape[1], X.shape[1]))
+        # alpha = select_best_path(D, X, alphas, intercepts, var_mat, criterion='bic')
+        # alpha = np.squeeze(alphas).T
+        # print(lambdas.shape, alphas.shape, intercepts.shape, np.sum(intercepts), X.shape, D.shape, alphas[..., 5].shape)
+        # print(lambdas)
+        # alpha = alphas[..., -1].T
+        # alpha = lasso_cd(X, D)
+        # print(type(X), type(D), type(alpha))
+        # X = np.dot(D, alpha)
+        alpha = np.squeeze(alpha).T
+        X = predict.squeeze()
 
     elif admm:
 

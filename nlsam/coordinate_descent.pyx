@@ -269,16 +269,24 @@ def lasso_cd(double[:, :] X, double[:, :] D, bint positive=True, int n_lambdas=1
         double[:, :] Q = np.dot(D.T, D)
         double[:, :] coefs = np.zeros((D.shape[1], X.shape[1]), dtype=np.float64)
 
-        # double[:] lambda_max = np.max(np.abs(q), axis=1)
-        # double[:] grid = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=n_lambdas)[::-1]
-    lbda=0
-    l1_ratio=0
-    for i, j in product(range(n), range(n_lambdas)):
-        l1_reg = lbda * l1_ratio * n_samples
-        # l2_reg = lbda * (1.0 - l1_ratio) * n_samples
-        coefs[:, i] = enet_coordinate_descent_gram(coefs[:, i], l1_reg, l2_reg, Q, q[:, i], X[:, i], max_iter, tol, positive)
+        np.ndarray[double, ndim=1] lambda_max = np.max(np.abs(q), axis=1)
+        np.ndarray[double, ndim=2] grid = np.empty((X.shape[1], n_lambdas))
 
-    return coefs
+    # for i in range(grid.shape[0]):
+    #     grid[i] = np.logspace(np.log10(lambda_max[:, i] * eps), np.log10(lambda_max[:, i]), num=n_lambdas)[::-1]
+
+    lbda=0.15
+    l1_ratio=1.
+    prev_coef = np.zeros(coefs.shape[0])
+    # for i, j in product(range(n), range(n_lambdas)):
+    for i in range(n):
+
+        l1_reg = lbda * l1_ratio * n_samples
+        l2_reg = lbda * (1.0 - l1_ratio) * n_samples
+        coefs[:, i] = enet_coordinate_descent_gram(prev_coef, l1_reg, l2_reg, Q, q[:, i], X[:, i], max_iter, tol, positive)
+        prev_coef[:] = coefs[:, i]
+
+    return np.asarray(coefs)
 
 import _glmnet
 # from _glmnet cimport elnet
