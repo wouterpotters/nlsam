@@ -6,7 +6,7 @@
 # Stripped out + heavily modifed version of
 # https://github.com/scikit-learn/scikit-learn/blob/master/sklearn/linear_model/cd_fast.pyx
 
-from itertools import product
+from itertools import product, repeat
 
 from libc.math cimport fabs
 cimport numpy as np
@@ -260,31 +260,31 @@ def lasso_cd(double[:, :] X, double[:, :] D, bint positive=True, int n_lambdas=1
     cdef:
         int n = X.shape[1]
         int n_samples = X.shape[0]
-        int i
+        int i, j
+
         double eps=1e-3
-        double l1_reg
+        double l1_reg = 1.
         double l2_reg = 0.
 
         double[:, :] q = np.dot(D.T, X)
         double[:, :] Q = np.dot(D.T, D)
-        double[:, :] coefs = np.zeros((D.shape[1], X.shape[1]), dtype=np.float64)
+        double[:, :, :] coefs = np.zeros((D.shape[1], X.shape[1], n_lambdas), dtype=np.float64)
+        double[:, :] prev_coef = np.zeros((D.shape[1], n_lambdas), dtype=np.float64)
 
-        np.ndarray[double, ndim=1] lambda_max = np.max(np.abs(q), axis=1)
-        np.ndarray[double, ndim=2] grid = np.empty((X.shape[1], n_lambdas))
+        double lambda_max = np.max(np.abs(q)) / n_samples
+        double[:] grid = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=n_lambdas)[::-1]
 
-    # for i in range(grid.shape[0]):
-    #     grid[i] = np.logspace(np.log10(lambda_max[:, i] * eps), np.log10(lambda_max[:, i]), num=n_lambdas)[::-1]
+        double lbda = 0.15
+        double l1_ratio = 1.
 
-    lbda=0.15
-    l1_ratio=1.
-    prev_coef = np.zeros(coefs.shape[0])
-    # for i, j in product(range(n), range(n_lambdas)):
-    for i in range(n):
-
+    for j, i in product(range(n_lambdas), range(n)):
+    # for i, j in product(range(n), [0]):
+        # lbda = grid[j]
+        # print(i,j,lbda,coefs.shape, coefs.ndim)
         l1_reg = lbda * l1_ratio * n_samples
         l2_reg = lbda * (1.0 - l1_ratio) * n_samples
-        coefs[:, i] = enet_coordinate_descent_gram(prev_coef, l1_reg, l2_reg, Q, q[:, i], X[:, i], max_iter, tol, positive)
-        prev_coef[:] = coefs[:, i]
+        coefs[:, i, j] = enet_coordinate_descent_gram(prev_coef[:, j], l1_reg, l2_reg, Q, q[:, i], X[:, i], max_iter, tol, positive)
+        prev_coef[:, j] = coefs[:, i, j]
 
     return np.asarray(coefs)
 

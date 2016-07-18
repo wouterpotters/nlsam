@@ -203,25 +203,61 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         # print(np.sum((X - np.dot(D, alpha))**2).shape, )
         return 0.5 * residuals + lbda * np.abs(alpha.data).sum()
 
-    prev_obj = 1e300
-    n_alphas = 10
-    eps = 0.001
-    custom_path = True
-    sklearn_path = True
-    admm = False
+    # prev_obj = 1e300
+    # n_alphas = 10
+    # eps = 0.001
+    # custom_path = True
+    # sklearn_path = True
+    # admm = False
     sam_path = True
 
+    def mystandardize(D):
+        S = np.std(D, axis=0, ddof=1)
+        M = np.mean(D, axis=0)
+        D_norm = (D - M) / S
+        return D_norm, M, S
+
+    lambda_max = np.abs(np.dot(D.T, X)).max() / (X.shape[0])
+    eps = 1e-3
+    # lambdas = [0.15, 0.015, 0.0015, 0.00015, 0.000015]
+    lambdas = [1.]
+    nlam = len(lambdas)
+    # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
+    # print(lambdas)
+    # 1/0
+    # lambdas=[0.0015]
+    Xhat = np.zeros((X.shape[0], nlam), dtype=np.float32)
+    alphas = np.zeros((D.shape[1], nlam), dtype=np.float32)
+    # Xhat = np.zeros((X.shape[0], nlam), dtype=np.float32)
+    # alphas = np.zeros((D.shape[1], nlam), dtype=np.float32)
+    # Xhat = np.zeros_like(Xs, dtype=np.float32)
+    # print(Xhat.shape, alphas.shape)
     if sam_path:
-        # X = np.asfortranarray(X / np.tile(np.sqrt((X*X).sum(axis=0)),(X.shape[0],1)),dtype=np.float64)
-        # D = np.asfortranarray(D / np.tile(np.sqrt((D*D).sum(axis=0)),(D.shape[0],1)),dtype=np.float64)
-        # alpha = np.zeros((D.shape[1], X.shape[1]))
+        # alphas = lasso_cd(X, D)
+        # # print(D.shape, alpha.shape)
+
         # for i in range(X.shape[1]):
-            # out = lasso_path(D, X[:, i], lambdas=[0.15])
-            # X[:, i] = lasso_path(D, X[:, i], lambdas=[0.15]).squeeze()
-            # alpha[:, i] = out[1].squeeze()
-            # print(np.sum(alpha[:, i] !=0))
-        lambdas, alpha, intercepts, predict = lasso_path(D, X, lambdas=[0.0015])
-        print(lambdas.shape, alpha.shape, intercepts.shape, predict.shape)
+        #     var_mat[i] = 1
+        #     Xhat = np.dot(D, alphas[:, i])
+        #     X[:, i], alpha[:, i] = select_best_path(D, X[:, i], alphas[:, i], Xhat, var_mat[i], criterion='aic')
+
+        for i in range(X.shape[1]):
+
+            # alphas[:] = lasso_cd(X[:, i:i+1], D).squeeze()
+            # Xhat[:] = np.dot(D, alphas).squeeze()
+            # X[:, i] = np.dot(D, alpha[:, i]).squeeze()
+            # # X[:, i], m, s = mystandardize(X[:, i])
+            Xhat[:], alphas[:] = lasso_path(D, X[:, i], nlam=nlam, intr=True, pos=True, isd=False, lambdas=lambdas, maxit=10000, )
+            # # var_mat[i]=1
+            # print(np.sum(alphas < 0))
+            X[:, i], alpha[:, i] = select_best_path(D, X[:, i], alphas, Xhat, var_mat[i], criterion='aic')
+            # # X[:, i], alpha[:, i] = Xhat[:, -1], alphas[:, -1]
+            # # X[:, i] = (X[:, i] * s) + m
+
+
+
+        # X, alpha = Xhat[..., 0].squeeze(), alphas[..., 0].squeeze()
+        # print(lambdas.shape, alpha.shape, intercepts.shape, predict.shape)
         # alphas = np.zeros((D.shape[1], X.shape[1], 100))
         # for idx in range(X.shape[1]):
         #     _, alphas[:,idx], _ = sk_lasso_path(D, X[:, idx])
@@ -236,8 +272,11 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         # alpha = lasso_cd(X, D)
         # print(type(X), type(D), type(alpha))
         # X = np.dot(D, alpha)
-        alpha = np.squeeze(alpha).T
-        X = predict.squeeze()
+        # alpha = np.squeeze(alpha).T
+        # alpha = np.swapaxes(alpha.squeeze(), 0, 1)
+        # X = np.dot(D, alpha)
+        # print(X.shape, D.shape, alpha.shape)
+        # X = predict.squeeze()
 
     elif admm:
 
