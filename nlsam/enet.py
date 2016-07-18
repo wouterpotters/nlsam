@@ -32,10 +32,11 @@ def elastic_net_path(X, y, rho, **kwargs):
         = elastic_net(X, y, rho, **kwargs)
 
     # Ordering from fortran starts at 1, so fix it to 0 for python
-    indices -= 1
+    # indices -= 1
 
     nlam = coefs_.shape[1]
     reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float32)
+    # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
 
     for i in range(nlam):
         nval = nin[i]
@@ -72,7 +73,7 @@ def select_best_path(X, y, beta, mu, variance, criterion='aic'):
     # print(X.shape, y.shape, beta.shape, mu.shape, variance.shape)
     residuals = np.sum((y[..., None] - mu)**2, axis=0, dtype=np.float32)
     df_mu = np.sum(beta != 0, axis=0, dtype=np.int16)
-    print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, residuals.shape, y.shape)
+    # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, residuals.shape, y.shape)
     criterion = (residuals / (n * variance)) + (w * df_mu / n)
     # print(criterion.shape, df_mu.shape, residuals.shape)
     # We don't want empty models

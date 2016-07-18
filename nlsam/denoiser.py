@@ -218,10 +218,10 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         return D_norm, M, S
 
     lambda_max = np.abs(np.dot(D.T, X)).max() / (X.shape[0])
-    eps = 1e-3
+    eps = 1e-6
     # lambdas = [0.15, 0.015, 0.0015, 0.00015, 0.000015]
-    lambdas = [1.]
-    nlam = len(lambdas)
+    # lambdas = [1.]
+    nlam = 100#len(lambdas)
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
     # print(lambdas)
     # 1/0
@@ -247,9 +247,9 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
             # Xhat[:] = np.dot(D, alphas).squeeze()
             # X[:, i] = np.dot(D, alpha[:, i]).squeeze()
             # # X[:, i], m, s = mystandardize(X[:, i])
-            Xhat[:], alphas[:] = lasso_path(D, X[:, i], nlam=nlam, intr=True, pos=True, isd=False, lambdas=lambdas, maxit=10000, )
+            Xhat[:], alphas[:] = lasso_path(D, X[:, i], nlam=nlam, intr=True, pos=True, isd=True)#, lambdas=lambdas, maxit=10000, )
             # # var_mat[i]=1
-            # print(np.sum(alphas < 0))
+            # print(D.shape, X[:, i].shape, alphas.shape, Xhat.shape, var_mat[i].shape)
             X[:, i], alpha[:, i] = select_best_path(D, X[:, i], alphas, Xhat, var_mat[i], criterion='aic')
             # # X[:, i], alpha[:, i] = Xhat[:, -1], alphas[:, -1]
             # # X[:, i] = (X[:, i] * s) + m
