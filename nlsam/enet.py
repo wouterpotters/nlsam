@@ -33,7 +33,7 @@ def elastic_net_path(X, y, rho, **kwargs):
 
     # Ordering from fortran starts at 1, so fix it to 0 for python
     # indices -= 1
-
+    # print(n_lambdas)
     nlam = coefs_.shape[1]
     reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float32)
     # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
@@ -253,7 +253,7 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
     """
     Raw-output wrapper for elastic net linear regression.
     """
-
+    # print(thr)
     # X/y is overwritten in the fortran function at every loop, so we must copy it each time
     X = np.array(X, copy=True, dtype=np.float64, order='F')
     y = np.array(y, copy=True, dtype=np.float64, order='F')
