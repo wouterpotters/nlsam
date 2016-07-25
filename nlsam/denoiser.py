@@ -7,6 +7,9 @@ from time import time
 from itertools import repeat
 # from functools import partial
 from multiprocessing import Pool
+from time import time
+
+from dipy.core.ndindex import ndindex
 
 from nlsam.utils import im2col_nd, col2im_nd#, sparse_dot_to_array
 from scipy.sparse import lil_matrix, csc_matrix, issparse
@@ -17,7 +20,7 @@ from sklearn.linear_model import lasso_path as sk_lasso_path
 from nlsam.coordinate_descent import lasso_cd
 from nlsam.enet import lasso_path, select_best_path
 
-# from sklearn.feature_extraction.image import extract_patches
+from sklearn.feature_extraction.image import extract_patches
 # from sklearn.linear_model import Lasso
 
 warnings.simplefilter("ignore", category=FutureWarning)
@@ -26,16 +29,6 @@ try:
     import spams
 except ImportError:
     raise ValueError("Couldn't find spams library, did you properly install the package?")
-
-# def universal_worker(input_pair):
-#     """http://stackoverflow.com/a/24446525"""
-#     function, args = input_pair
-#     return function(*args)
-
-
-# def pool_args(function, *args):
-#     return izip(repeat(function), *izip(*args))
-
 
 
 def greedy_set_finder(sets):
@@ -76,28 +69,41 @@ def processer(arglist):
 def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, dtype=np.float64, n_iter=10, gamma=3., tau=1.):
 
     # mask=np.ones_like(mask)
-    data = data.astype(np.float32)
+    # data = data.astype(np.float32)
     orig_shape = data.shape
+    extraction_step = np.array([1, 1, 1, block_size[-1]])
     mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
+
+    # mask_array = extract_patches(mask, patch_shape=block_size[:3], extraction_step=extraction_step[:3])
+    # mask_array = mask_array.reshape([-1] + list(block_size[:-1]))
+    # mask_array = mask_array.reshape(mask_array.shape[0], -1).T
+    # print(np.sum(np.abs(mask_array - b)))
     train_idx = np.sum(mask_array, axis=0) > mask_array.shape[0] / 2
 
     # If mask is empty, return a bunch of zeros as blocks
     if not np.any(train_idx):
         return np.zeros_like(data)
 
-    X = im2col_nd(data, block_size, overlap)
-    # extraction_step = np.array([1, 1, 1, block_size[-1]])
+    # X = im2col_nd(data, block_size, overlap)
+    # a1 = time()
+    D = param_alpha['D']
     # print(data.shape, extraction_step, block_size)
-    # X = extract_patches(data, patch_shape=block_size, extraction_step=extraction_step)
+    X = extract_patches(data, patch_shape=block_size, extraction_step=extraction_step)
+    X_out = np.zeros((D.shape[0], train_idx.shape[0]), dtype=np.float32)
+    # print(X.shape, X_out.shape)
+    # 1/0
     # print(X.shape)
+    # X = X.reshape([-1] + list(block_size))
+    # X = X.reshape(X.shape[0], -1).T
+    # a2 = time()
+    # X2 = im2col_nd(data, block_size, overlap)
+    # print(np.sum(np.abs(X - X2)), time() - a2, a2 - a1)
     # 1/0
     var_mat = np.median(im2col_nd(variance[..., 0:orig_shape[-1]], block_size, overlap), axis=0).astype(np.float32)
-    X_full_shape = X.shape
+    # X_full_shape = X.shape
     # X = X[:, train_idx].astype(np.float32)
 
-    D = param_alpha['D']
-
-    alpha = np.zeros((D.shape[1], X.shape[1]), dtype=np.float32)
+    alpha = np.zeros((D.shape[1], X_out.shape[1]), dtype=np.float32)
 
     def mystandardize(D):
         S = np.std(D, axis=0, ddof=1)
@@ -105,42 +111,44 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         D_norm = (D - M) / S
         return D_norm, M, S
 
-
     nlam = 100  #len(lambdas)
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
     # print(lambdas)
     # 1/0
     # lambdas=[0.0015]
-    Xhat = np.zeros((X.shape[0], nlam), dtype=np.float64)
+    Xhat = np.zeros((D.shape[0], nlam), dtype=np.float64)
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
     # Xhat = np.zeros((X.shape[0], nlam), dtype=np.float32)
     # alphas = np.zeros((D.shape[1], nlam), dtype=np.float32)
     # Xhat = np.zeros_like(Xs, dtype=np.float32)
     # print(Xhat.shape, alphas.shape)
 
-    for i in range(X.shape[1]):
+    for i, idx in enumerate(ndindex(X.shape[:4])):
+        # print(i, X.shape[1], idx)
         if not train_idx[i]:
             continue
-        # print(i, X.shape[1])
+        # print(i, X.shape[1], idx)
         # alphas[:] = lasso_cd(X[:, i:i+1], D).squeeze()
         # Xhat[:] = np.dot(D, alphas).squeeze()
         # X[:, i] = np.dot(D, alpha[:, i]).squeeze()
         # # X[:, i], m, s = mystandardize(X[:, i])
-        Xhat[:], alphas[:] = lasso_path(D, X[:, i], nlam=nlam, intr=True, pos=True, isd=True)#, lambdas=lambdas, maxit=10000, )
+        # print(D.shape, X[idx].shape, X[idx].ravel().shape, Xhat.shape, alphas.shape)
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, intr=True, pos=True, isd=True)#, lambdas=lambdas, maxit=10000, )
         # # var_mat[i]=1
         # print(D.shape, X[:, i].shape, alphas.shape, Xhat.shape, var_mat[i].shape)
-        X[:, i], alpha[:, i] = select_best_path(D, X[:, i], alphas, Xhat, var_mat[i], criterion='bic')
+        X_out[:, i], alpha[:, i] = select_best_path(D, X[idx], alphas, Xhat, var_mat[i], criterion='bic')
+        # print(np.sum(np.isnan(Xhat)), np.sum(np.isnan(alphas)))
         # # X[:, i], alpha[:, i] = Xhat[:, -1], alphas[:, -1]
         # # X[:, i] = (X[:, i] * s) + m
 
-    weigths = np.ones(X_full_shape[1], dtype=dtype, order='F')
+    weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
     # weigths[train_idx] = 1. / ((alpha != 0).sum(axis=0) + 1.)
     # print(type(X), X.shape)
     # X2 = np.zeros(X_full_shape, dtype=dtype, order='F')
     # # print(X2.shape, X.shape, D.shape, alpha.shape)
     # X2[:, train_idx] = X
 
-    return col2im_nd(X, block_size, orig_shape, overlap, weigths)
+    return col2im_nd(X_out, block_size, orig_shape, overlap, weigths)
     # return col2im_nd(X2, block_size, orig_shape, overlap, weigths)
 
 

@@ -125,9 +125,9 @@ def main():
     if data.shape[:-1] != mask.shape:
         raise ValueError('data shape is {}, but mask shape {} is different!'.format(data.shape, mask.shape))
 
-    # data = data[:, 50:60]
-    # mask = mask[:, 50:60]
-    # sigma = sigma[:, 50:60]
+    data = data[:, 50:60]
+    mask = mask[:, 50:60]
+    sigma = sigma[:, 50:60]
 
     bvals, bvecs = read_bvals_bvecs(args.bvals, args.bvecs)
 

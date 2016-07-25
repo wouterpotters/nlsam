@@ -52,7 +52,7 @@ def select_best_path(X, y, beta, mu, variance, criterion='aic'):
     '''See https://arxiv.org/pdf/0712.0881.pdf p. 9 eq. 2.15 and 2.16'''
 
     # y.shape(y.shape[0])
-    y = y.squeeze()
+    y = y.copy().ravel()
     n = y.shape[0]
 
     if criterion == 'aic':
@@ -125,127 +125,127 @@ def lasso_path(X, y, **kwargs):
     return elastic_net_path(X, y, rho=1.0, **kwargs)
 
 
-def __elastic_net(X, y, rho, **kwargs):
+# def __elastic_net(X, y, rho, **kwargs):
 
-    # out = [None] * y.shape[1]
-    # for i in range(y.shape[1]):
-    #     out[i] =
-    # print(len(out))
+#     # out = [None] * y.shape[1]
+#     # for i in range(y.shape[1]):
+#     #     out[i] =
+#     # print(len(out))
 
-    n_lambdas, intercepts, coefs_, indices, nin, _, lambdas, _, jerr = _elastic_net(X, y, rho, **kwargs)
+#     n_lambdas, intercepts, coefs_, indices, nin, _, lambdas, _, jerr = _elastic_net(X, y, rho, **kwargs)
 
-    return n_lambdas, intercepts[None, :], coefs_[None, :], indices[None, :], nin[None, :], _, lambdas[None, :], _, jerr
+#     return n_lambdas, intercepts[None, :], coefs_[None, :], indices[None, :], nin[None, :], _, lambdas[None, :], _, jerr
 
 
-def _elastic_net(predictors, target, balance, memlimit=None,
-                 largest=None, **kwargs):
-    """
-    Raw-output wrapper for elastic net linear regression.
-    """
-    _DEFAULT_THRESH = 1.0e-4
-    _DEFAULT_FLMIN = 0.001
-    _DEFAULT_NLAM = 100
-    # Mandatory parameters
-    predictors = np.asanyarray(predictors)
-    target = np.asanyarray(target)
+# def _elastic_net(predictors, target, balance, memlimit=None,
+#                  largest=None, **kwargs):
+#     """
+#     Raw-output wrapper for elastic net linear regression.
+#     """
+#     _DEFAULT_THRESH = 1.0e-4
+#     _DEFAULT_FLMIN = 0.001
+#     _DEFAULT_NLAM = 100
+#     # Mandatory parameters
+#     predictors = np.asanyarray(predictors)
+#     target = np.asanyarray(target)
 
-    # Decide on largest allowable models for memory/convergence.
-    memlimit = predictors.shape[1] if memlimit is None else memlimit
+#     # Decide on largest allowable models for memory/convergence.
+#     memlimit = predictors.shape[1] if memlimit is None else memlimit
 
-    # If largest isn't specified use memlimit.
-    largest = memlimit if largest is None else largest
+#     # If largest isn't specified use memlimit.
+#     largest = memlimit if largest is None else largest
 
-    if memlimit < largest:
-        raise ValueError('Need largest <= memlimit')
+#     if memlimit < largest:
+#         raise ValueError('Need largest <= memlimit')
 
-    # Flags determining overwrite behavior
-    overwrite_pred_ok = False
-    overwrite_targ_ok = False
+#     # Flags determining overwrite behavior
+#     overwrite_pred_ok = False
+#     overwrite_targ_ok = False
 
-    thr = _DEFAULT_THRESH   # Minimum change in largest coefficient
-    weights = None          # Relative weighting per observation case
-    vp = None               # Relative penalties per predictor (0 = no penalty)
-    isd = True              # Standardize input variables before proceeding?
-    jd = np.zeros(1)        # Predictors to exclude altogether from fitting
-    ulam = None             # User-specified lambda values
-    flmin = _DEFAULT_FLMIN  # Fraction of largest lambda at which to stop
-    nlam = _DEFAULT_NLAM    # The (maximum) number of lambdas to try.
+#     thr = _DEFAULT_THRESH   # Minimum change in largest coefficient
+#     weights = None          # Relative weighting per observation case
+#     vp = None               # Relative penalties per predictor (0 = no penalty)
+#     isd = True              # Standardize input variables before proceeding?
+#     jd = np.zeros(1)        # Predictors to exclude altogether from fitting
+#     ulam = None             # User-specified lambda values
+#     flmin = _DEFAULT_FLMIN  # Fraction of largest lambda at which to stop
+#     nlam = _DEFAULT_NLAM    # The (maximum) number of lambdas to try.
 
-    for keyword in kwargs:
-        if keyword == 'overwrite_pred_ok':
-            overwrite_pred_ok = kwargs[keyword]
-        elif keyword == 'overwrite_targ_ok':
-            overwrite_targ_ok = kwargs[keyword]
-        elif keyword == 'threshold':
-            thr = kwargs[keyword]
-        elif keyword == 'weights':
-            weights = np.asarray(kwargs[keyword]).copy()
-        elif keyword == 'penalties':
-            vp = kwargs[keyword].copy()
-        elif keyword == 'standardize':
-            isd = bool(kwargs[keyword])
-        elif keyword == 'exclude':
-            # Add one since Fortran indices start at 1
-            exclude = (np.asarray(kwargs[keyword]) + 1).tolist()
-            jd = np.array([len(exclude)] + exclude)
-        elif keyword == 'lambdas':
-            if 'flmin' in kwargs:
-                raise ValueError("Can't specify both lambdas & flmin keywords")
-            ulam = np.asarray(kwargs[keyword])
-            flmin = 2. # Pass flmin > 1.0 indicating to use the user-supplied.
-            nlam = len(ulam)
-        elif keyword == 'flmin':
-            flmin = kwargs[keyword]
-            ulam = None
-        elif keyword == 'nlam':
-            if 'lambdas' in kwargs:
-                raise ValueError("Can't specify both lambdas & nlam keywords")
-            nlam = kwargs[keyword]
-        else:
-            raise ValueError("Unknown keyword argument '%s'" % keyword)
+#     for keyword in kwargs:
+#         if keyword == 'overwrite_pred_ok':
+#             overwrite_pred_ok = kwargs[keyword]
+#         elif keyword == 'overwrite_targ_ok':
+#             overwrite_targ_ok = kwargs[keyword]
+#         elif keyword == 'threshold':
+#             thr = kwargs[keyword]
+#         elif keyword == 'weights':
+#             weights = np.asarray(kwargs[keyword]).copy()
+#         elif keyword == 'penalties':
+#             vp = kwargs[keyword].copy()
+#         elif keyword == 'standardize':
+#             isd = bool(kwargs[keyword])
+#         elif keyword == 'exclude':
+#             # Add one since Fortran indices start at 1
+#             exclude = (np.asarray(kwargs[keyword]) + 1).tolist()
+#             jd = np.array([len(exclude)] + exclude)
+#         elif keyword == 'lambdas':
+#             if 'flmin' in kwargs:
+#                 raise ValueError("Can't specify both lambdas & flmin keywords")
+#             ulam = np.asarray(kwargs[keyword])
+#             flmin = 2. # Pass flmin > 1.0 indicating to use the user-supplied.
+#             nlam = len(ulam)
+#         elif keyword == 'flmin':
+#             flmin = kwargs[keyword]
+#             ulam = None
+#         elif keyword == 'nlam':
+#             if 'lambdas' in kwargs:
+#                 raise ValueError("Can't specify both lambdas & nlam keywords")
+#             nlam = kwargs[keyword]
+#         else:
+#             raise ValueError("Unknown keyword argument '%s'" % keyword)
 
-    box_constraints = np.zeros((2, predictors.shape[1]), order='F')
-    box_constraints[1] = 1e300
-    # box_constraints[0] = -1e300
+#     box_constraints = np.zeros((2, predictors.shape[1]), order='F')
+#     box_constraints[1] = 1e300
+#     # box_constraints[0] = -1e300
 
-    # If predictors is a Fortran contiguous array, it will be overwritten.
-    # Decide whether we want this. If it's not Fortran contiguous it will
-    # be copied into that form anyway so there's no chance of overwriting.
-    if np.isfortran(predictors):
-        if not overwrite_pred_ok:
-            # Might as well make it F-ordered to avoid ANOTHER copy.
-            predictors = predictors.copy(order='F')
+#     # If predictors is a Fortran contiguous array, it will be overwritten.
+#     # Decide whether we want this. If it's not Fortran contiguous it will
+#     # be copied into that form anyway so there's no chance of overwriting.
+#     if np.isfortran(predictors):
+#         if not overwrite_pred_ok:
+#             # Might as well make it F-ordered to avoid ANOTHER copy.
+#             predictors = predictors.copy(order='F')
 
-    # target being a 1-dimensional array will usually be overwritten
-    # with the standardized version unless we take steps to copy it.
-    if not overwrite_targ_ok:
-        target = target.copy()
+#     # target being a 1-dimensional array will usually be overwritten
+#     # with the standardized version unless we take steps to copy it.
+#     if not overwrite_targ_ok:
+#         target = target.copy()
 
-    # Uniform weighting if no weights are specified.
-    if weights is None:
-        weights = np.ones(predictors.shape[0])
+#     # Uniform weighting if no weights are specified.
+#     if weights is None:
+#         weights = np.ones(predictors.shape[0])
 
-    # Uniform penalties if none were specified.
-    if vp is None:
-        vp = np.ones(predictors.shape[1])
+#     # Uniform penalties if none were specified.
+#     if vp is None:
+#         vp = np.ones(predictors.shape[1])
 
-    # Call the Fortran wrapper.
-    lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr =  \
-            _glmnet.elnet(balance, predictors, target, weights, jd, vp, box_constraints,
-                          memlimit, flmin, ulam, thr, nlam=nlam)
+#     # Call the Fortran wrapper.
+#     lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr =  \
+#             _glmnet.elnet(balance, predictors, target, weights, jd, vp, box_constraints,
+#                           memlimit, flmin, ulam, thr, nlam=nlam)
 
-    # Check for errors, documented in glmnet.f.
-    if jerr != 0:
-        if jerr == 10000:
-            raise ValueError('cannot have max(vp) < 0.0')
-        elif jerr == 7777:
-            raise ValueError('all used predictors have 0 variance')
-        elif jerr < 7777:
-            raise MemoryError('elnet() returned error code %d' % jerr)
-        else:
-            raise Exception('unknown error: %d' % jerr)
+#     # Check for errors, documented in glmnet.f.
+#     if jerr != 0:
+#         if jerr == 10000:
+#             raise ValueError('cannot have max(vp) < 0.0')
+#         elif jerr == 7777:
+#             raise ValueError('all used predictors have 0 variance')
+#         elif jerr < 7777:
+#             raise MemoryError('elnet() returned error code %d' % jerr)
+#         else:
+#             raise Exception('unknown error: %d' % jerr)
 
-    return lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr
+#     return lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr
 
 
 def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
@@ -256,7 +256,7 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
     # print(thr)
     # X/y is overwritten in the fortran function at every loop, so we must copy it each time
     X = np.array(X, copy=True, dtype=np.float64, order='F')
-    y = np.array(y, copy=True, dtype=np.float64, order='F')
+    y = np.array(y.ravel(), copy=True, dtype=np.float64, order='F')
 
     # if y.ndim != 2:
     #     y.shape = (y.shape + (1,))
@@ -331,12 +331,12 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
 
     # Uniform weighting if no weights are specified.
     if weights is None:
-        weights = np.ones(X.shape[0])
+        weights = np.ones(X.shape[0], order='F')
     else:
         weights = np.asarray(weights).copy()
     # Uniform penalties if none were specified.
     if vp is None:
-        vp = np.ones(X.shape[1])
+        vp = np.ones(X.shape[1], order='F')
     else:
         vp = vp.copy()
 
