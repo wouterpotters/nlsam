@@ -32,7 +32,7 @@ def elastic_net_path(X, y, rho, **kwargs):
         = elastic_net(X, y, rho, **kwargs)
 
     # Ordering from fortran starts at 1, so fix it to 0 for python
-    # indices -= 1
+    indices -= 1
     # print(n_lambdas)
     nlam = coefs_.shape[1]
     reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float32)
@@ -40,7 +40,7 @@ def elastic_net_path(X, y, rho, **kwargs):
 
     for i in range(nlam):
         nval = nin[i]
-        ind = indices[:nval] - 1
+        ind = indices[:nval]
         reordered_coefs[ind, i] = coefs_[:nval, i]
 
     predict = np.dot(X, reordered_coefs) + intercepts

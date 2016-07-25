@@ -72,13 +72,12 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     # data = data.astype(np.float32)
     orig_shape = data.shape
     extraction_step = np.array([1, 1, 1, block_size[-1]])
-    mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
+    # mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
 
-    # mask_array = extract_patches(mask, patch_shape=block_size[:3], extraction_step=extraction_step[:3])
-    # mask_array = mask_array.reshape([-1] + list(block_size[:-1]))
+    mask_array = extract_patches(mask, patch_shape=block_size[:3], extraction_step=extraction_step[:3])
     # mask_array = mask_array.reshape(mask_array.shape[0], -1).T
     # print(np.sum(np.abs(mask_array - b)))
-    train_idx = np.sum(mask_array, axis=0) > mask_array.shape[0] / 2
+    train_idx = np.sum(mask_array.reshape([-1] + list(block_size[:-1])), axis=(1, 2, 3)) > mask_array.shape[0] / 2
 
     # If mask is empty, return a bunch of zeros as blocks
     if not np.any(train_idx):
@@ -102,7 +101,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     var_mat = np.median(im2col_nd(variance[..., 0:orig_shape[-1]], block_size, overlap), axis=0).astype(np.float32)
     # X_full_shape = X.shape
     # X = X[:, train_idx].astype(np.float32)
-
+    var_mat = np.ones_like(var_mat)
     alpha = np.zeros((D.shape[1], X_out.shape[1]), dtype=np.float32)
 
     def mystandardize(D):
