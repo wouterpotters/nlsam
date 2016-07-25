@@ -87,7 +87,7 @@ def main():
     print("Now denoising " + os.path.realpath(args.input))
 
     vol = nib.load(args.input)
-    data = np.asarray(vol.get_data(caching='unchanged'))  # To force ndarray instead of memmaps
+    data = np.asarray(vol.get_data(caching='unchanged'), dtype=np.float32)  # To force ndarray instead of memmaps
     affine = vol.get_affine()
 
     sigma = nib.load(args.sigma).get_data()**2
