@@ -72,12 +72,13 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     # data = data.astype(np.float32)
     orig_shape = data.shape
     extraction_step = np.array([1, 1, 1, block_size[-1]])
-    # mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
+    mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
+    train_idx = np.sum(mask_array, axis=0) > mask_array.shape[0] / 2
 
-    mask_array = extract_patches(mask, patch_shape=block_size[:3], extraction_step=extraction_step[:3])
-    # mask_array = mask_array.reshape(mask_array.shape[0], -1).T
-    # print(np.sum(np.abs(mask_array - b)))
-    train_idx = np.sum(mask_array.reshape([-1] + list(block_size[:-1])), axis=(1, 2, 3)) > mask_array.shape[0] / 2
+    # mask_array = extract_patches(mask, patch_shape=block_size[:3], extraction_step=extraction_step[:3])
+    # # mask_array = mask_array.reshape(mask_array.shape[0], -1).T
+    # # print(np.sum(np.abs(mask_array - b)))
+    # train_idx = np.sum(mask_array.reshape([-1] + list(block_size[:-1])), axis=(1, 2, 3)) > mask_array.shape[0] / 2
 
     # If mask is empty, return a bunch of zeros as blocks
     if not np.any(train_idx):
@@ -179,8 +180,18 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
     # mask_col = im2col_nd(mask, block_size[:3], no_over[:3])
     mask_col = im2col_nd(np.broadcast_to(mask[..., None], data.shape), block_size, no_over)
     train_idx = np.sum(mask_col, axis=0) > mask_col.shape[0]/2
-
+    # print(train_idx.shape)
+    # mask_array = extract_patches(mask, patch_shape=block_size, extraction_step=block_size)
+    # # mask_array = mask_array.reshape(mask_array.shape[0], -1).T
+    # # print(np.sum(np.abs(mask_array - b)))
+    # train_idx = np.sum(mask_array.reshape([-1] + list(block_size[:2])), axis=(1, 2)) > mask_array.shape[0] / 2
+    # print(train_idx.shape)
+    # 1/0
     train_data = X[:, train_idx]
+    # print(train_idx.shape, train_data.shape)
+    # print(np.sum(train_idx), np.sum( np.any(train_data != 0, axis=0)))
+    # print(np.sum(train_data), np.sum(train_data[:, np.any(train_data != 0, axis=0)]))
+    # 1/0
     train_data = np.asfortranarray(train_data[:, np.any(train_data != 0, axis=0)], dtype=dtype)
     train_data /= np.sqrt(np.sum(train_data**2, axis=0, keepdims=True), dtype=dtype)
     param_alpha['D'] = spams.trainDL(train_data, **param_D)
