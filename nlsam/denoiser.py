@@ -4,14 +4,14 @@ import numpy as np
 import warnings
 from time import time
 
-from itertools import repeat
+from itertools import repeat, product, izip
 # from functools import partial
 from multiprocessing import Pool
 from time import time
 
 from dipy.core.ndindex import ndindex
 
-from nlsam.utils import im2col_nd, col2im_nd#, sparse_dot_to_array
+from nlsam.utils import im2col_nd, col2im_nd, padding #sparse_dot_to_array
 from scipy.sparse import lil_matrix, csc_matrix, issparse
 
 from glmnet import ElasticNet, CVGlmNet
@@ -21,6 +21,7 @@ from nlsam.coordinate_descent import lasso_cd
 from nlsam.enet import lasso_path, select_best_path
 
 from sklearn.feature_extraction.image import extract_patches
+# from skimage.util.shape import view_as_windows
 # from sklearn.linear_model import Lasso
 
 warnings.simplefilter("ignore", category=FutureWarning)
@@ -102,7 +103,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     var_mat = np.median(im2col_nd(variance[..., 0:orig_shape[-1]], block_size, overlap), axis=0).astype(np.float32)
     # X_full_shape = X.shape
     # X = X[:, train_idx].astype(np.float32)
-    var_mat = np.ones_like(var_mat)
+    # var_mat = np.ones_like(var_mat)
     alpha = np.zeros((D.shape[1], X_out.shape[1]), dtype=np.float32)
 
     def mystandardize(D):
@@ -137,6 +138,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         # # var_mat[i]=1
         # print(D.shape, X[:, i].shape, alphas.shape, Xhat.shape, var_mat[i].shape)
         X_out[:, i], alpha[:, i] = select_best_path(D, X[idx], alphas, Xhat, var_mat[i], criterion='bic')
+        # print(np.sum(alpha[:, i]<0))
         # print(np.sum(np.isnan(Xhat)), np.sum(np.isnan(alphas)))
         # # X[:, i], alpha[:, i] = Xhat[:, -1], alphas[:, -1]
         # # X[:, i] = (X[:, i] * s) + m
@@ -156,11 +158,29 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
             mask=None, dtype=np.float64):
 
 
+    # print(padding(data, block_size, overlap).shape, data.shape)
+
+    # a=time()
+    # extraction_step = [1, 1 ,1, data.shape[-1]] #np.array([1, 1, 1, block_size[-1]])
+    # X2 = extract_patches(data, patch_shape=block_size, extraction_step=extraction_step)
+    # a1=time()
+    # X2=X2.reshape([-1] + list(block_size))
+    # # X3 = view_as_windows(data, window_shape=block_size, step=extraction_step).reshape([-1] + list(block_size))
+    # # print(X2.shape, X3.shape, np.sum(np.abs(X2-X3)))
+    # c=time()
+    # X2 = X2.reshape(X2.shape[0], -1).T
+    # b=time()
+
     # no overlapping blocks for training
     no_over = (0, 0, 0, 0)
     X = im2col_nd(data, block_size, no_over)
 
-    # Solving for D
+    # print(data.shape, block_size)
+    # t=time()
+    # print(t-b, t-a, b-c,c-a1,a1-a)#, np.sum(np.abs(X-X2)))
+    # # 1/0
+    # X=X2
+    # # Solving for D
     param_alpha['pos'] = True
     param_alpha['mode'] = 2
     param_alpha['lambda1'] = 1.2 / np.sqrt(np.prod(block_size))
@@ -177,6 +197,7 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
     if 'D' in param_alpha:
         param_D['D'] = param_alpha['D']
 
+    # a=time()
     # mask_col = im2col_nd(mask, block_size[:3], no_over[:3])
     mask_col = im2col_nd(np.broadcast_to(mask[..., None], data.shape), block_size, no_over)
     train_idx = np.sum(mask_col, axis=0) > mask_col.shape[0]/2
@@ -187,13 +208,21 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
     # train_idx = np.sum(mask_array.reshape([-1] + list(block_size[:2])), axis=(1, 2)) > mask_array.shape[0] / 2
     # print(train_idx.shape)
     # 1/0
+
     train_data = X[:, train_idx]
     # print(train_idx.shape, train_data.shape)
     # print(np.sum(train_idx), np.sum( np.any(train_data != 0, axis=0)))
     # print(np.sum(train_data), np.sum(train_data[:, np.any(train_data != 0, axis=0)]))
     # 1/0
-    train_data = np.asfortranarray(train_data[:, np.any(train_data != 0, axis=0)], dtype=dtype)
+    # print(train_idx.shape, X.shape, train_data.shape)
+    # print(np.sum(np.abs(train_data)))
+    # 1/0
+    # train_data = np.asfortranarray(train_data[:, np.any(train_data != 0, axis=0)], dtype=dtype)
+    # print(np.sum(np.abs(train_data)))
     train_data /= np.sqrt(np.sum(train_data**2, axis=0, keepdims=True), dtype=dtype)
+    # print(train_idx.shape, X.shape, train_data.shape)
+    # print(time()-a)
+    # 1/0
     param_alpha['D'] = spams.trainDL(train_data, **param_D)
     param_alpha['D'] /= np.sqrt(np.sum(param_alpha['D']**2, axis=0, keepdims=True, dtype=dtype))
     param_D['D'] = param_alpha['D']
@@ -206,6 +235,7 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
 
     time_multi = time()
     pool = Pool(processes=n_cores)
+    # a=time()
 
     arglist = [(data[:, :, k:k+block_size[2]], mask[:, :, k:k+block_size[2]], variance[:, :, k:k+block_size[2]], block_size_subset, overlap_subset, param_alpha_subset, param_D_subset, dtype_subset, n_iter_subset)
                for k, block_size_subset, overlap_subset, param_alpha_subset, param_D_subset, dtype_subset, n_iter_subset
@@ -217,7 +247,8 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
                       repeat(dtype),
                       repeat(n_iter))]
     # arglist = [(data, mask, variance, block_size, overlap, param_alpha, param_D, dtype, n_iter)]
-
+    # print(time()-a, memory_usage_resource()-mem, mem)
+    # 1/0
     data_denoised = pool.map(processer, arglist)
     pool.close()
     pool.join()

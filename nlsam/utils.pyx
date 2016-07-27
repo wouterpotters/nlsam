@@ -211,7 +211,7 @@ cdef void _col2im4D(double[::1,:,:,:] A, double[::1,:,:] div, double[::1,:] R, d
                         for n in range(s1):
                             for o in range(s2):
                                 for p in range(t):
-                                    A[a+m, b+n, c+o, p] += R[l, k] * weights[k]
+                                    A[a+m, b+n, c+o, p] += R[l, k] #* weights[k]
                                     l += 1
 
                                 div[a+m, b+n, c+o] += weights[k]
@@ -261,7 +261,7 @@ def col2im_nd(R, block_shape, end_shape, overlap, weights=None, order='F'):
     else:
         raise ValueError("3D or 4D supported only!", A.shape)
 
-    return (A / div).astype(dtype, copy=False)
+    return A / div#.astype(dtype, copy=False)
 
 
 def padding(A, block_shape, overlap):

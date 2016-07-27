@@ -75,7 +75,7 @@ def select_best_path(X, y, beta, mu, variance, criterion='aic'):
     df_mu = np.sum(beta != 0, axis=0, dtype=np.int16)
     # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, residuals.shape, y.shape)
     criterion = (residuals / (n * variance)) + (w * df_mu / n)
-    # print(criterion.shape, df_mu.shape, residuals.shape)
+
     # We don't want empty models
     criterion[df_mu == 0] = 1e300
 
