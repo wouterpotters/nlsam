@@ -21,6 +21,7 @@ from nlsam.coordinate_descent import lasso_cd
 from nlsam.enet import lasso_path, select_best_path
 
 from sklearn.feature_extraction.image import extract_patches
+from scipy.optimize import nnls
 # from skimage.util.shape import view_as_windows
 # from sklearn.linear_model import Lasso
 
@@ -70,7 +71,7 @@ def processer(arglist):
 def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, dtype=np.float64, n_iter=10, gamma=3., tau=1.):
 
     # mask=np.ones_like(mask)
-    # data = data.astype(np.float32)
+    # data = data.astype(np.float64)
     orig_shape = data.shape
     extraction_step = np.array([1, 1, 1, block_size[-1]])
     mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
@@ -112,19 +113,20 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         D_norm = (D - M) / S
         return D_norm, M, S
 
-    nlam = 100  #len(lambdas)
+    nlam = 30  #len(lambdas)
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
     # print(lambdas)
     # 1/0
     # lambdas=[0.0015]
     Xhat = np.zeros((D.shape[0], nlam), dtype=np.float64)
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
+    best = np.zeros(X_out.shape[1])
     # Xhat = np.zeros((X.shape[0], nlam), dtype=np.float32)
     # alphas = np.zeros((D.shape[1], nlam), dtype=np.float32)
     # Xhat = np.zeros_like(Xs, dtype=np.float32)
     # print(Xhat.shape, alphas.shape)
 
-    for i, idx in enumerate(ndindex(X.shape[:4])):
+    for i, idx in enumerate(ndindex(X.shape[:X.ndim//2])):
         # print(i, X.shape[1], idx)
         if not train_idx[i]:
             continue
@@ -134,11 +136,28 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         # X[:, i] = np.dot(D, alpha[:, i]).squeeze()
         # # X[:, i], m, s = mystandardize(X[:, i])
         # print(D.shape, X[idx].shape, X[idx].ravel().shape, Xhat.shape, alphas.shape)
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, intr=True, pos=True, isd=True)#, lambdas=lambdas, maxit=10000, )
+        # xm = np.mean(X[idx])
+        # X[idx] -= xm
+        # xx,m,s = mystandardize(X[idx].ravel())
+        # m = X[idx].mean()
+        # X[idx] -= m
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, intr=True, pos=True, isd=True, ols=False)#, lambdas=lambdas, maxit=10000, )
+        # Xhat[:] += m
+        # X[idx] += m
+        # Xhat[:] * s + m
+        # Xhat += xm
         # # var_mat[i]=1
         # print(D.shape, X[:, i].shape, alphas.shape, Xhat.shape, var_mat[i].shape)
-        X_out[:, i], alpha[:, i] = select_best_path(D, X[idx], alphas, Xhat, var_mat[i], criterion='bic')
-        # print(np.sum(alpha[:, i]<0))
+        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat[i], criterion='ric')
+
+    # try:
+    #     infile = np.load(open('arr.npy', 'r'))
+    # except IOError:
+    #     infile = np.zeros(1)
+    # with open('arr.npy', 'w') as file:
+    #     np.save(file, np.append(infile, best))
+
+    # print(np.sum(alpha<0), np.sum(X_out<0), np.sum(D<0), np.sum(X<0), np.sum(data < 0))
         # print(np.sum(np.isnan(Xhat)), np.sum(np.isnan(alphas)))
         # # X[:, i], alpha[:, i] = Xhat[:, -1], alphas[:, -1]
         # # X[:, i] = (X[:, i] * s) + m
@@ -217,14 +236,14 @@ def denoise(data, block_size, overlap, param_alpha, param_D, variance, n_iter=10
     # print(train_idx.shape, X.shape, train_data.shape)
     # print(np.sum(np.abs(train_data)))
     # 1/0
-    # train_data = np.asfortranarray(train_data[:, np.any(train_data != 0, axis=0)], dtype=dtype)
+    train_data = np.asfortranarray(train_data[:, np.any(train_data != 0, axis=0)], dtype=np.float64)
     # print(np.sum(np.abs(train_data)))
-    train_data /= np.sqrt(np.sum(train_data**2, axis=0, keepdims=True), dtype=dtype)
+    train_data /= np.sqrt(np.sum(train_data**2, axis=0, keepdims=True), dtype=np.float64)
     # print(train_idx.shape, X.shape, train_data.shape)
     # print(time()-a)
     # 1/0
     param_alpha['D'] = spams.trainDL(train_data, **param_D)
-    param_alpha['D'] /= np.sqrt(np.sum(param_alpha['D']**2, axis=0, keepdims=True, dtype=dtype))
+    param_alpha['D'] /= np.sqrt(np.sum(param_alpha['D']**2, axis=0, keepdims=True, dtype=np.float64))
     param_D['D'] = param_alpha['D']
 
     del train_data

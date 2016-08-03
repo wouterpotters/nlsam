@@ -2,6 +2,9 @@ import numpy as np
 from _glmnet import elnet, modval, uncomp, solns
 import _glmnet
 from scipy.sparse import csr_matrix
+from scipy.optimize import nnls
+from scipy.linalg import lstsq
+
 # class ElasticNet(object):
 #     """ElasticNet based on GLMNET"""
 #     def __init__(self, alpha, rho=0.2):
@@ -25,7 +28,7 @@ from scipy.sparse import csr_matrix
 #         return np.dot(X, self.coef_) + self.intercept_
 
 
-def elastic_net_path(X, y, rho, **kwargs):
+def elastic_net_path(X, y, rho, ols=False, **kwargs):
     """return full path for ElasticNet"""
 
     n_lambdas, intercepts, coefs_, indices, nin, _, lambdas, _, jerr \
@@ -33,7 +36,7 @@ def elastic_net_path(X, y, rho, **kwargs):
 
     # Ordering from fortran starts at 1, so fix it to 0 for python
     indices -= 1
-    # print(n_lambdas)
+
     nlam = coefs_.shape[1]
     reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float32)
     # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
@@ -43,24 +46,41 @@ def elastic_net_path(X, y, rho, **kwargs):
         ind = indices[:nval]
         reordered_coefs[ind, i] = coefs_[:nval, i]
 
-    predict = np.dot(X, reordered_coefs) + intercepts
+    # ols = True
+    if ols:
+        predict = np.zeros((X.shape[0], nlam))
 
+        # print(reordered_coefs.shape, X.shape, y.shape)
+
+        for i in range(nlam):
+            idx = reordered_coefs[:, i] != 0
+            if np.sum(idx) > 0:
+                sol, _ = nnls(X[:, idx], y.ravel())
+                # sol = lstsq(X[:, idx], y.ravel())[0]
+                predict[:, i] = np.dot(X[:, idx], sol) + intercepts[i]
+    else:
+        predict = np.dot(X, reordered_coefs) + intercepts
+    # print(np.sum(intercepts))
     return predict, reordered_coefs
 
 
-def select_best_path(X, y, beta, mu, variance, criterion='aic'):
+def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     '''See https://arxiv.org/pdf/0712.0881.pdf p. 9 eq. 2.15 and 2.16'''
 
     # y.shape(y.shape[0])
     y = y.copy().ravel()
     n = y.shape[0]
+    p = X.shape[1]
 
     if criterion == 'aic':
         w = 2
     elif criterion == 'bic':
         w = np.log(n)
+    elif criterion == 'ric':
+        w = 2 * np.log(p)
     else:
         raise ValueError('Criterion {} is not supported!'.format(criterion))
+
 
     # mu = np.empty((X.shape[0],) + intercepts.shape, dtype=np.float32)
     # print(mu.shape, X.shape, y.shape, beta.shape, intercepts.shape, variance.shape)
@@ -71,15 +91,26 @@ def select_best_path(X, y, beta, mu, variance, criterion='aic'):
     #     mu[:, i] = np.dot(X, beta[i]) + intercepts[i]
 
     # print(X.shape, y.shape, beta.shape, mu.shape, variance.shape)
-    residuals = np.sum((y[..., None] - mu)**2, axis=0, dtype=np.float32)
-    df_mu = np.sum(beta != 0, axis=0, dtype=np.int16)
-    # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, residuals.shape, y.shape)
-    criterion = (residuals / (n * variance)) + (w * df_mu / n)
+    mse = np.mean((y[..., None] - mu)**2, axis=0, dtype=np.float32)
+    df_mu = np.sum(beta != 0, axis=0, dtype=np.int32)
+    # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, sse.shape, y.shape)
+    # variance=None
+
+    # Use SSE/n estimate for sample variance - we assume normally distributed
+    # residuals though for the log likelihood function...
+    if variance is None:
+        criterion = n * np.log(mse) + df_mu * w
+        # s2 = sse / n
+        # log_L = np.log(1 / np.sqrt(2 * np.pi * s2)) * n - sse / (2 * s2)
+        # criterion = w * df_mu - 2 * log_L
+    else:
+        criterion = (mse / variance) + (w * df_mu / n)
 
     # We don't want empty models
     criterion[df_mu == 0] = 1e300
 
     best_idx = np.argmin(criterion, axis=0)
+    # print(best_idx)
 
     # print(mu.shape, best_idx.shape, beta.shape)
     # print(best_idx)
@@ -91,7 +122,7 @@ def select_best_path(X, y, beta, mu, variance, criterion='aic'):
     #     print(mu[i])
     # print(best_idx, criterion[best_idx-1], criterion[best_idx])
     # print(criterion)
-    return mu[:, best_idx], beta[:, best_idx]
+    return mu[:, best_idx], beta[:, best_idx], best_idx
     # best_betas = np.empty(beta.shape[:-1], dtype=np.float32)
     # best_mu = np.empty(y.shape, dtype=np.float32)
     # print(criterion.shape, best_idx.shape, best_betas.shape, beta.shape, best_mu.shape, mu.shape)
@@ -107,7 +138,7 @@ def select_best_path(X, y, beta, mu, variance, criterion='aic'):
 #     return ElasticNet(alpha, rho=1.0)
 
 
-def lasso_path(X, y, **kwargs):
+def lasso_path(X, y, ols=False, **kwargs):
     """return full path for Lasso"""
 
     # from glmnet import ElasticNet
@@ -122,7 +153,7 @@ def lasso_path(X, y, **kwargs):
     #     yhat[:, i], alpha[:, i] = enet.predict(X).squeeze(), enet.get_coefficients_from_lambda_idx(i)
     # return yhat, alpha
     # # return enet.get_coefficients_from_lambda_idx(0)
-    return elastic_net_path(X, y, rho=1.0, **kwargs)
+    return elastic_net_path(X, y, rho=1.0, ols=ols, **kwargs)
 
 
 # def __elastic_net(X, y, rho, **kwargs):
