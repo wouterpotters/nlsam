@@ -122,25 +122,13 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
     best = np.zeros(X_out.shape[1])
 
-    # md = D.mean(axis=0, keepdims=True)
-    #
-    # print(D.shape, md.shape)
-    # 1/0
     for i, idx in enumerate(ndindex(X.shape[:X.ndim // 2])):
 
         if not train_idx[i]:
             continue
 
-        # mx = np.mean(X[idx])
-        # X[idx] -= mx
-        # D -= mx
-
         Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, intr=True, pos=True, isd=False, ols=False)#, lambdas=lambdas, maxit=10000, )
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
-        # X_out[:, i] += mx
-        # D += mx
-    # D += md
-
 
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
     # weigths[train_idx] = 1. / ((alpha != 0).sum(axis=0) + 1.)

@@ -219,7 +219,7 @@ def main():
     if rest_of_b0s is not None:
 
         b0_denoised = np.squeeze(data_denoised[..., b0_loc])
-        data_denoised_insert = np.empty(original_shape, original_dtype)
+        data_denoised_insert = np.empty(original_shape, dtype=np.float32)
         n = 0
         for i in range(original_shape[-1]):
             if i in rest_of_b0s:
@@ -232,7 +232,9 @@ def main():
 
     # Remove crap at borders
     data_denoised *= mask[..., None]
-    nib.save(nib.Nifti1Image(data_denoised.astype(original_dtype), affine), args.output)
+    data_denoised.clip(min=0, out=data_denoised)
+
+    nib.save(nib.Nifti1Image(data_denoised.astype(np.float32), affine), args.output)
 
 
 if __name__ == "__main__":
