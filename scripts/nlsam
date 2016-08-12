@@ -125,9 +125,9 @@ def main():
     if data.shape[:-1] != mask.shape:
         raise ValueError('data shape is {}, but mask shape {} is different!'.format(data.shape, mask.shape))
 
-    # data = data[:, 80:92]
-    # mask = mask[:, 80:92]
-    # sigma = sigma[:, 80:92]
+    data = data[:, 80:92]
+    mask = mask[:, 80:92]
+    sigma = sigma[:, 80:92]
 
     bvals, bvecs = read_bvals_bvecs(args.bvals, args.bvecs)
 
@@ -189,14 +189,22 @@ def main():
 
     # Put all idx + b0 in this array in each iteration
     to_denoise = np.empty(data.shape[:-1] + (block_size[-1] + 1,), dtype=np.float64)
-
+    # b0_block_size = np.array(b0_block_size)
+    # b0_block_size[-1] -= 1
+    # to_denoise = np.empty(data.shape[:-1] + (block_size[-1],), dtype=np.float64)
     for i, idx in enumerate(indexes):
         dwi_idx = tuple(np.where(idx <= b0_loc, idx, np.array(idx) + num_b0s))
         print('Now denoising volumes {} / block {} out of {}.'.format(idx, i+1, len(indexes)))
 
         to_denoise[..., 0] = np.copy(b0)
         to_denoise[..., 1:] = data[..., idx]
+        # idx = to_denoise > 0
+        # to_denoise[idx] /= to_denoise[idx, 0:1]
+        # to_denoise[idx] = np.log(to_denoise[idx])
+        # to_denoise = to_denoise[..., 1:]
 
+        # idx = np.isnan(to_denoise)
+        # to_denoise[idx] = 0
         data_denoised[..., b0_loc + dwi_idx] += denoise(to_denoise,
                                                         b0_block_size,
                                                         overlap,
@@ -214,7 +222,7 @@ def main():
                                   :orig_shape[1],
                                   :orig_shape[2],
                                   :orig_shape[3]] / divider
-
+    # data_denoised[..., -1] = b0
     # Put back the original number of b0s
     if rest_of_b0s is not None:
 

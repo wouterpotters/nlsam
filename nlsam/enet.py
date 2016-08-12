@@ -1,5 +1,5 @@
 import numpy as np
-from _glmnet import elnet, modval, uncomp, solns
+from _glmnet import elnet, modval, uncomp, solns, fishnet
 import _glmnet
 from scipy.sparse import csr_matrix
 from scipy.optimize import nnls
@@ -9,21 +9,25 @@ from scipy.linalg import lstsq
 def elastic_net_path(X, y, rho, ols=False, **kwargs):
     """return full path for ElasticNet"""
 
-    n_lambdas, intercepts, coefs_, indices, nin, _, lambdas, _, jerr \
+    n_lambdas, intercepts, coefs, indices, nin, _, lambdas, _, jerr \
         = elastic_net(X, y, rho, **kwargs)
 
     # Ordering from fortran starts at 1, so fix it to 0 for python
     indices -= 1
 
-    nlam = coefs_.shape[1]
-    reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float32)
+    nlam = coefs.shape[1]
+    reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float64)
+    # reordered_coefs2 = np.zeros((X.shape[1], nlam), dtype=np.float64)
     # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
 
     for i in range(nlam):
         nval = nin[i]
         ind = indices[:nval]
-        reordered_coefs[ind, i] = coefs_[:nval, i]
+        reordered_coefs[ind, i] = coefs[:nval, i]
 
+    # reordered_coefs2[indices[:nin]] = coefs[:nin]
+    # print(np.sum(np.abs(reordered_coefs - reordered_coefs2)))
+    # print(reordered_coefs, reordered_coefs2)
     # ols = True
     if ols:
         predict = np.zeros((X.shape[0], nlam))
@@ -38,7 +42,10 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
                 predict[:, i] = np.dot(X[:, idx], sol) + intercepts[i]
     else:
         predict = np.dot(X, reordered_coefs) + intercepts
-    # print(np.sum(intercepts))
+        # idx = reordered_coefs != 0
+        # p2 = np.dot(X[:, idx], reordered_coefs[idx]) + intercepts
+        # print(np.sum(np.abs(predict-p2)))
+    # print(np.sum(reordered_coefs != 0, axis=1), lambdas, coefs.shape[1], n_lambdas)
     return predict, reordered_coefs
 
 
@@ -76,7 +83,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, sse.shape, y.shape)
     # variance=None
 
-    # Use SSE/n estimate for sample variance - we assume normally distributed
+    # Use mse = SSE/n estimate for sample variance - we assume normally distributed
     # residuals though for the log-likelihood function...
     if variance is None:
         criterion = n * np.log(mse) + df_mu * w
@@ -99,7 +106,7 @@ def lasso_path(X, y, ols=False, **kwargs):
 
 
 def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
-                isd=False, nlam=100, maxit=1000, intr=False, **kwargs):
+                standardize=False, nlam=100, maxit=10000, fit_intercept=False, **kwargs):
     """
     Raw-output wrapper for elastic net linear regression.
     """
@@ -183,7 +190,7 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
     if weights is None:
         weights = np.ones(X.shape[0], order='F')
     else:
-        weights = np.asarray(weights).copy()
+        weights = np.array(weights, copy=True, order='F')
 
     # Uniform penalties if none were specified.
     if vp is None:
@@ -196,7 +203,7 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
 
     lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
         elnet(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
-              nlam=nlam, isd=isd, maxit=maxit, intr=intr)
+              nlam=nlam, isd=standardize, maxit=maxit, intr=fit_intercept)
 
     return lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr
 

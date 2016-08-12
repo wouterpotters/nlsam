@@ -78,7 +78,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     no_overlap = False
 
     if no_overlap:
-        overlap = (0,0,0,0)
+        overlap = (0, 0, 0, 0)
         extraction_step = list(block_size)[:-1] + [1]
 
     # print(mask.shape, block_size[:-1],  extraction_step[:-1])
@@ -121,15 +121,36 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
     Xhat = np.zeros((D.shape[0], nlam), dtype=np.float64)
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
     best = np.zeros(X_out.shape[1])
+    weights = np.ones(X_out.shape[0])
+
+    # Assume b/b0 for weights
+    # iidx = np.prod(block_size[:-1])
 
     for i, idx in enumerate(ndindex(X.shape[:X.ndim // 2])):
 
         if not train_idx[i]:
             continue
+        # print(X.shape, X[idx].shape)
+        # np.log(X[idx][..., 1:] / X[idx][..., 0:1])
+        # weights[iidx:] = (-1/1000.) * np.log(X[idx][..., 1:] / X[idx][..., 0:1]).ravel()
+        # adc = 800 * 1e-6
+        # print((X[idx][..., 0:1] * np.exp(-1000 * adc)).ravel().shape, weights[iidx:].shape, weights.shape, np.prod(block_size[:-1]))
+        # weights[iidx:] = (X[idx][..., 0:1] * np.exp(-1000 * adc)).ravel().repeat(block_size[-1] - 1)
+        # print(X[idx][..., 0:1].shape, X.shape, X[idx].shape)
+        # weights = 1/(X[idx] / X[idx][..., 0:1]).ravel()
+        # weights = (X[idx] / X[idx][..., 0:1]).ravel()
+        # iso = nnls(D, X[idx].ravel())[0]
+        # isoc = np.dot(D, iso)
+        # print(isoc.reshape(np.prod(block_size)).shape, isoc.shape, X[idx].shape)
+        # X[idx] -= isoc.reshape(block_size)
+        weigths = None
+        # weights = (1. / X[idx]).ravel()#.repeat(block_size[-1])
+        # weights = (1. / X[idx][..., 0:1]).ravel().repeat(block_size[-1])
+        # weights[np.logical_not(np.isfinite(weights))] = 0
 
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, intr=True, pos=True, isd=False, ols=False)#, lambdas=lambdas, maxit=10000, )
-        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
-
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True, ols=False, weights=weights)#, lambdas=lambdas, maxit=10000, )
+        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='ric')
+        # X_out[:, i] += isoc
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
     # weigths[train_idx] = 1. / ((alpha != 0).sum(axis=0) + 1.)
 
