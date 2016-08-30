@@ -1,25 +1,37 @@
 <!DOCTYPE html>
-<html lang="en-us">
+<html>
   <head>
-    <meta charset="UTF-8">
-    <title>NLSAM by samuelstjean</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
-    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
-    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>NLSAM by samuelstjean</title>
   </head>
-  <body>
-    <section class="page-header">
-      <h1 class="project-name">NLSAM</h1>
-      <h2 class="project-tagline">The reference implementation for the Non Local Spatial and Angular Matching (NLSAM) denoising algorithm for diffusion MRI</h2>
-      <a href="https://github.com/samuelstjean/nlsam" class="btn">View on GitHub</a>
-      <a href="https://github.com/samuelstjean/nlsam/zipball/master" class="btn">Download .zip</a>
-      <a href="https://github.com/samuelstjean/nlsam/tarball/master" class="btn">Download .tar.gz</a>
-    </section>
 
-    <section class="main-content">
-      <h1>
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>NLSAM</h1>
+          <h2>The reference implementation for the Non Local Spatial and Angular Matching (NLSAM) denoising algorithm for diffusion MRI</h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/samuelstjean/nlsam/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/samuelstjean/nlsam/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/samuelstjean/nlsam" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <h1>
 <a id="non-local-spatial-and-angular-matching-nlsam-denoising" class="anchor" href="#non-local-spatial-and-angular-matching-nlsam-denoising" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Non Local Spatial and Angular Matching (NLSAM) denoising</h1>
 
 <p>The reference implementation for the Non Local Spatial and Angular Matching (NLSAM) denoising algorithm for diffusion MRI.</p>
@@ -27,97 +39,84 @@
 <h2>
 <a id="how-to-install" class="anchor" href="#how-to-install" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>How to install</h2>
 
-<p>The easiest way is to go grab a <a href="https://github.com/samuelstjean/nlsam/releases">release</a>, in which case the downloaded zip file contains everything you need (no python installation required, you can use it straight away without installing anything else). 
+<p>The easiest way is to go grab a <a href="https://github.com/samuelstjean/nlsam/releases">release</a>, in which case the downloaded zip file contains everything you need (no python installation required,
+you can use it straight away without installing anything else).
 After extracting the zip file, start a terminal/command line prompt (start button, then type cmd + enter on windows) and navigate to where you extracted the binaries.</p>
 
 <p>Since the tools are command line only, double-clicking it will open and immediately close a dos-like window, hence the need for opening a command line prompt.</p>
 
-<p>If you would like to look at the code and modify it, you can build it from source by following the <a href="#Dependencies">instructions</a>.
-You can also download the datasets used in the paper over <a href="https://github.com/samuelstjean/nlsam_data">here</a>.</p>
+<p>If you have a working python setup already, the next command should give you everything you need.</p>
+
+<div class="highlight highlight-source-shell"><pre>pip install https://github.com/samuelstjean/nlsam/archive/master.zip --user --process-dependency-links</pre></div>
+
+<p>If you would like to look at the code and modify it, you can also clone it locally
+and then install everything through pip after grabbing some dependencies</p>
+
+<div class="highlight highlight-source-shell"><pre>git clone https://github.com/samuelstjean/nlsam.git
+pip install -e nlsam</pre></div>
+
+<p>Check out the <a href="https://github.com/samuelstjean/nlsam/wiki">wiki</a> for detailed instructions about each platforms.</p>
+
+<ul>
+<li><a href="https://github.com/samuelstjean/nlsam/wiki/Installation-for-Windows">Windows</a></li>
+<li><a href="https://github.com/samuelstjean/nlsam/wiki/Installation-for-Mac-OSX">Mac OSX</a></li>
+<li><a href="https://github.com/samuelstjean/nlsam/wiki/Installation-for-linux">Linux</a></li>
+</ul>
+
+<p>You can also download the datasets used in the paper over <a href="https://github.com/samuelstjean/nlsam_data">here</a>.</p>
 
 <h2>
 <a id="using-the-nlsam-algorithm" class="anchor" href="#using-the-nlsam-algorithm" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Using the NLSAM algorithm</h2>
 
-<p>Once installed, there are two main scripts, the stabilization algorithm and the NLSAM algorithm itself.
-The first one allows you to transform the data to Gaussian distributed signals if your dataset is Rician or Noncentral chi distributed.</p>
+<p>Once installed, there is now a single script to do the whole processing.
+Feel free to have a look if you want to build your own python pipeline as it
+wraps the various parts of the algorithm provided inside the python-part library.</p>
 
-<p>A simple example call for the stabilization would be </p>
+<p>The process is to first transform your data to Gaussian distributed signals if your dataset is
+Rician or Noncentral chi distributed and then proceed to the NLSAM denoising part itself.</p>
 
-<div class="highlight highlight-source-shell"><pre>stabilizer dwi.nii.gz dwi_stab.nii.gz 1 sigma.nii.gz -m mask.nii.gz --bvals bvals --bvecs bvecs </pre></div>
+<p>A quickstart example call would be</p>
 
-<p>and for the NLSAM denoising</p>
+<div class="highlight highlight-source-shell"><pre>nlsam_denoising dwi.nii.gz dwi_nlsam.nii.gz 1 bvals bvecs 5 -m mask.nii.gz</pre></div>
 
-<div class="highlight highlight-source-shell"><pre>nlsam dwi_stab.nii.gz dwi_nlsam.nii.gz 5 bvals bvecs sigma.nii.gz -m mask.nii.gz</pre></div>
+<p>For more fine grained control and explanation of arguments,
+have a look at the possible command line options with nlsam_denoising --help</p>
 
-<p>You can find a detailed usage example and assorted dataset to try out in the <a href="https://github.com/samuelstjean/nlsam/tree/master/example">example</a> folder.</p>
-
-<p><a name="Dependencies"></a></p>
-
-<h2>
-<a id="dependencies" class="anchor" href="#dependencies" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Dependencies</h2>
-
-<p>You will need to have at least numpy, scipy, nibabel, dipy, cython, cython-gsl and spams installed with python 2.7.
-Fortunately, the setup.py will take care of installing everything you need.</p>
-
-<ul>
-<li>On Debian/Ubuntu, you will need some development headers which can be installed with</li>
-</ul>
-
-<div class="highlight highlight-source-shell"><pre>sudo apt-get install build-essential libgsl0-dev python-dev libopenblas-dev libopenblas-base liblapack-dev</pre></div>
-
-<p>Of course feel free to use your favorite blas/lapack implementation (such as intel MKL),
-but I got 5x faster runtimes out of openblas vs atlas for NLSAM just by switching libraries.</p>
-
-<ul>
-<li>On Windows and Mac OSX, it will be easier to grab a python distribution which includes everything such as <a href="https://www.continuum.io/downloads">Anaconda</a>.
-Additionally, grab a build of spams for windows <a href="https://github.com/samuelstjean/spams-python/releases/download/0.1/spams-python-v2.4-svn2013-06-24.win-amd64-py2.7.exe">here</a> if you don't want to build it.</li>
-<li>Additionally, you might need <a href="https://www.microsoft.com/en-us/download/details.aspx?id=44266">Visual C++ Compiler for python 2.7</a> if you encounter the <em>Unable to  find vsvarsall.bat</em> error when installing nlsam on Windows.</li>
-</ul>
-
-<p>If you have a working python setup already, doing</p>
-
-<div class="highlight highlight-source-shell"><pre>pip install https://github.com/samuelstjean/nlsam/archive/master.zip --user --process-dependency-links</pre></div>
-
-<p>should give you everything you need.</p>
-
-<p>You can also clone it locally and then build the files with</p>
-
-<div class="highlight highlight-source-shell"><pre>git clone https://github.com/samuelstjean/nlsam.git
-<span class="pl-c1">cd</span> nlsam
-python setup.py build_ext -i</pre></div>
-
-<p>Don't forget to add the path where you cloned everything to your PYTHONPATH.</p>
+<p>You can find a detailed usage example and assorted dataset to try out in the
+<a href="example">example</a> folder.</p>
 
 <h2>
 <a id="questions--need-help--think-this-is-great-software" class="anchor" href="#questions--need-help--think-this-is-great-software" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Questions / Need help / Think this is great software?</h2>
 
-<p>If you need help or would like more information, don't hesitate to drop me a line at <a href="mailto:firstname@isi.uu.nl">firstname@isi.uu.nl</a>, where of course firstname needs to be replace with samuel.</p>
+<p>If you need help or would like more information, don't hesitate to drop me a
+line at <a href="mailto:firstname@isi.uu.nl">firstname@isi.uu.nl</a>, where of course firstname needs to be replaced with samuel.</p>
 
 <h2>
 <a id="reference" class="anchor" href="#reference" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Reference</h2>
 
-<p>St-Jean, S., P. Coupé, and M. Descoteaux.
+<p>St-Jean, S., Coupé, P., &amp; Descoteaux, M. (2016).
 "<a href="http://scil.dinf.usherbrooke.ca/wp-content/papers/stjean-etal-media16.pdf">Non Local Spatial and Angular Matching : Enabling higher spatial resolution diffusion MRI datasets through adaptive denoising.</a>"
-Medical Image Analysis, 2016. <a href="http://www.sciencedirect.com/science/article/pii/S1361841516000335">DOI</a></p>
+Medical Image Analysis, 32(2016), 115–130. <a href="http://www.sciencedirect.com/science/article/pii/S1361841516000335">DOI</a></p>
 
 <h2>
 <a id="license" class="anchor" href="#license" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>License</h2>
 
-<p>As the main solver I use (spams) is GPL licensed and the stabilization script uses the GNU GSL library,
-the NLSAM main codebase is also licensed under the GPL v3, see the file LICENSE for more information.</p>
+<p>As the main solver I use <a href="http://spams-devel.gforge.inria.fr/">spams</a> is GPL licensed and the stabilization script
+uses the GNU GSL library, the NLSAM main codebase is also licensed under the
+GPL v3, see the file LICENSE for more information.</p>
 
 <p>If you would like to reuse parts of this work under another project/license,
 feel free to drop me an email and I will gladly re-license the files you need
 as MIT/BSD/whatever else.</p>
+        </section>
 
-      <footer class="site-footer">
-        <span class="site-footer-owner"><a href="https://github.com/samuelstjean/nlsam">NLSAM</a> is maintained by <a href="https://github.com/samuelstjean">samuelstjean</a>.</span>
+        <footer>
+          NLSAM is maintained by <a href="https://github.com/samuelstjean">samuelstjean</a><br>
+          This page was generated by <a href="https://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
 
-        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
-      </footer>
-
-    </section>
-
-  
+        
+      </div>
+    </div>
   </body>
 </html>
