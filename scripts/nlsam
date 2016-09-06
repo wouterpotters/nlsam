@@ -93,7 +93,7 @@ def main():
     sigma = nib.load(args.sigma).get_data()**2
 
     greedy_subsampler = True
-    implausible_signal_boost = True
+    implausible_signal_boost = False
     b0_thresh = 10
     n_iter = args.iterations
 
@@ -125,9 +125,9 @@ def main():
     if data.shape[:-1] != mask.shape:
         raise ValueError('data shape is {}, but mask shape {} is different!'.format(data.shape, mask.shape))
 
-    data = data[:, 80:92]
-    mask = mask[:, 80:92]
-    sigma = sigma[:, 80:92]
+#    data = data[:, 80:92]
+ #   mask = mask[:, 80:92]
+  #  sigma = sigma[:, 80:92]
 
     bvals, bvecs = read_bvals_bvecs(args.bvals, args.bvecs)
 

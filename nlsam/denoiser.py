@@ -14,10 +14,10 @@ from dipy.core.ndindex import ndindex
 from nlsam.utils import im2col_nd, col2im_nd, padding #sparse_dot_to_array
 from scipy.sparse import lil_matrix, csc_matrix, issparse
 
-from glmnet import ElasticNet, CVGlmNet
+#from glmnet import ElasticNet, CVGlmNet
 # from sklearn.linear_model import lasso_path, LassoLarsIC, lars_path
 from sklearn.linear_model import lasso_path as sk_lasso_path
-from nlsam.coordinate_descent import lasso_cd
+#from nlsam.coordinate_descent import lasso_cd
 from nlsam.enet import lasso_path, select_best_path
 
 from sklearn.feature_extraction.image import extract_patches
@@ -117,7 +117,7 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         return D_norm, M, S
 
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
-    nlam = 50  #len(lambdas)
+    nlam = 100  #len(lambdas)
     Xhat = np.zeros((D.shape[0], nlam), dtype=np.float64)
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
     best = np.zeros(X_out.shape[1])
@@ -148,8 +148,8 @@ def _processer(data, mask, variance, block_size, overlap, param_alpha, param_D, 
         # weights = (1. / X[idx][..., 0:1]).ravel().repeat(block_size[-1])
         # weights[np.logical_not(np.isfinite(weights))] = 0
 
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True, ols=False, weights=weights)#, lambdas=lambdas, maxit=10000, )
-        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='ric')
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True, ols=False, weights=weights) #, lambdas=lambdas, maxit=10000)
+        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
         # X_out[:, i] += isoc
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
     # weigths[train_idx] = 1. / ((alpha != 0).sum(axis=0) + 1.)
