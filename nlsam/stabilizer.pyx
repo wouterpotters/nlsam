@@ -4,7 +4,8 @@ cimport cython
 
 from itertools import repeat
 from libc.math cimport sqrt, exp, fabs, M_PI, isnan
-from multiprocessing import Pool, cpu_count
+# from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
 from joblib import Parallel, delayed
 
 import numpy as np
@@ -53,19 +54,16 @@ def stabilization(data, m_hat, mask, sigma, N, n_cores=None):
         n_cores = cpu_count()
 
     data_out = Parallel(n_jobs=n_cores)(
-        delayed(_multiprocess_stabilization)(data[..., idx, :],
-        m_hat[..., idx, :],
-        mask[..., idx, :],
-        sigma[..., idx, :],
-        N_vox)
-        for idx, N_vox in zip(range(data.shape[-2]), repeat(N)))
+        delayed(_multiprocess_stabilization)(
+            data[idx], m_hat[idx], mask[idx], sigma[idx], N_vox)
+            for idx, N_vox in zip(range(data.shape[0]), repeat(N)))
     print(type(data_out))
     print(np.shape(data_out))
-    data_stabilized = np.empty(data.shape, dtype=np.float32)
-    for idx in range(len(data_out)):
-      data_stabilized[..., idx, :] = data_out[idx]
+    # data_stabilized = np.empty(data.shape, dtype=np.float32)
+    # for idx in range(len(data_out)):
+    #   data_stabilized[..., idx, :] = data_out[idx]
 
-    return data_stabilized
+    return np.array(data_out, dtype=np.float32)
 
 
 def _multiprocess_stabilization(data, m_hat, mask, sigma, N):
