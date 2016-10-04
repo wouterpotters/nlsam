@@ -1,6 +1,6 @@
 import numpy as np
 from _glmnet import elnet, modval, uncomp, solns, fishnet
-import _glmnet
+# import _glmnet
 from scipy.sparse import csr_matrix
 from scipy.optimize import nnls
 from scipy.linalg import lstsq
@@ -50,7 +50,12 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
 
 
 def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
-    '''See https://arxiv.org/pdf/0712.0881.pdf p. 9 eq. 2.15 and 2.16'''
+    '''See https://arxiv.org/pdf/0712.0881.pdf p. 9 eq. 2.15 and 2.16
+    X is D
+    y is X
+    beta is alpha
+    mu is X_hat = D * alpha
+    '''
 
     # y.shape(y.shape[0])
     y = y.copy().ravel()
@@ -109,6 +114,9 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
                 standardize=False, nlam=100, maxit=10000, fit_intercept=False, **kwargs):
     """
     Raw-output wrapper for elastic net linear regression.
+    X is D
+    y is X
+    rho for lasso/elastic net tradeoff
     """
     # print(thr)
     # X/y is overwritten in the fortran function at every loop, so we must copy it each time
@@ -212,52 +220,52 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
 # https://github.com/ceholden/glmnet-python/blob/master/glmnet/utils.py
 
 
-def IC_path(X, y, coefs, intercepts, criterion='aic'):
-    """ Return AIC, BIC, or AICc for sets of estimated coefficients
+# def IC_path(X, y, coefs, intercepts, criterion='aic'):
+#     """ Return AIC, BIC, or AICc for sets of estimated coefficients
 
-    Args:
-        X (np.ndarray): 2D (n_obs x n_features) design matrix
-        y (np.ndarray): 1D dependent variable
-        coefs (np.ndarray): 1 or 2D array of coefficients estimated from
-            GLMNET using one or more ``lambdas`` (n_coef x n_lambdas)
-        intercepts (np.ndarray): 1 or 2D array of intercepts from
-            GLMNET using one or more ``lambdas`` (n_lambdas)
-        criterion (str): AIC (Akaike Information Criterion), BIC (Bayesian
-            Information Criterion), or AICc (Akaike Information Criterion
-            corrected for finite sample sizes)
+#     Args:
+#         X (np.ndarray): 2D (n_obs x n_features) design matrix
+#         y (np.ndarray): 1D dependent variable
+#         coefs (np.ndarray): 1 or 2D array of coefficients estimated from
+#             GLMNET using one or more ``lambdas`` (n_coef x n_lambdas)
+#         intercepts (np.ndarray): 1 or 2D array of intercepts from
+#             GLMNET using one or more ``lambdas`` (n_lambdas)
+#         criterion (str): AIC (Akaike Information Criterion), BIC (Bayesian
+#             Information Criterion), or AICc (Akaike Information Criterion
+#             corrected for finite sample sizes)
 
-    Returns:
-        np.ndarray: information criterion as 1D array (n_lambdas)
+#     Returns:
+#         np.ndarray: information criterion as 1D array (n_lambdas)
 
-    Note: AIC and BIC calculations taken from scikit-learn's LarsCV
+#     Note: AIC and BIC calculations taken from scikit-learn's LarsCV
 
-    """
-    # coefs = np.atleast_2d(coefs)
+#     """
+#     # coefs = np.atleast_2d(coefs)
 
-    n_samples = y.shape[0]
+#     n_samples = y.shape[0]
 
-    criterion = criterion.lower()
-    if criterion == 'aic' or criterion == 'aicc':
-        K = 2
-    elif criterion == 'bic':
-        K = np.log(n_samples)
-    else:
-        raise ValueError('Criterion must be either AIC, BIC, or AICc')
+#     criterion = criterion.lower()
+#     if criterion == 'aic' or criterion == 'aicc':
+#         K = 2
+#     elif criterion == 'bic':
+#         K = np.log(n_samples)
+#     else:
+#         raise ValueError('Criterion must be either AIC, BIC, or AICc')
 
-    residuals = y[:, np.newaxis] - (np.dot(X, coefs) + intercepts)
-    mse = np.mean(residuals**2, axis=0)
-    # df = np.zeros(coefs.shape[1], dtype=np.int16)
-    df = np.sum(coefs != 0, axis=-1)
+#     residuals = y[:, np.newaxis] - (np.dot(X, coefs) + intercepts)
+#     mse = np.mean(residuals**2, axis=0)
+#     # df = np.zeros(coefs.shape[1], dtype=np.int16)
+#     df = np.sum(coefs != 0, axis=-1)
 
-    # for k, coef in enumerate(coefs.T):
-    #     mask = np.abs(coef) > np.finfo(coef.dtype).eps
-    #     if not np.any(mask):
-    #         continue
-    #     df[k] = np.sum(mask)
+#     # for k, coef in enumerate(coefs.T):
+#     #     mask = np.abs(coef) > np.finfo(coef.dtype).eps
+#     #     if not np.any(mask):
+#     #         continue
+#     #     df[k] = np.sum(mask)
 
-    with np.errstate(divide='ignore'):
-        criterion_ = n_samples * np.log(mse) + K * df
-        if criterion == 'aicc':
-            criterion_ += (2 * df * (df + 1)) / (n_samples - df - 1)
+#     with np.errstate(divide='ignore'):
+#         criterion_ = n_samples * np.log(mse) + K * df
+#         if criterion == 'aicc':
+#             criterion_ += (2 * df * (df + 1)) / (n_samples - df - 1)
 
-    return criterion_
+#     return criterion_

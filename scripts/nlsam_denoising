@@ -22,7 +22,7 @@ import numpy as np
 
 from nlsam.denoiser import nlsam_denoise
 from nlsam.smoothing import local_standard_deviation, sh_smooth, local_piesno
-from nlsam.stabilizer import corrected_sigma, stabilization
+from nlsam.stabilizer import corrected_sigma, stabilization, _test_chi_to_gauss as chi_to_gauss
 
 from dipy.io.gradients import read_bvals_bvecs
 from dipy.core.gradients import gradient_table
@@ -227,6 +227,9 @@ def main():
     else:
         mask = np.ones(data.shape[:-1], dtype=np.bool)
 
+    data = data[:, 10:35]
+    mask = mask[:, 10:35]
+
     bvals, bvecs = read_bvals_bvecs(args.bvals, args.bvecs)
     gtab = gradient_table(bvals, bvecs, b0_threshold=b0_threshold)
 
@@ -353,6 +356,15 @@ def main():
                                       subsample=subsample,
                                       n_iter=n_iter,
                                       b0_threshold=b0_threshold)
+
+        if args.no_stabilization:
+            print('doing post stab')
+            # sigma = np.var(data_stabilized - data_denoised, axis=-1)
+            for idx in np.ndindex(mask.shape):
+                if mask[idx]:
+                    for i in range(data_denoised.shape[-1]):
+                        # print((data_denoised[idx + (i,)].shape, data_denoised[idx + (i,)].shape, sigma[idx], idx + (i,)))
+                        data_denoised[idx + (i,)] = chi_to_gauss(data_denoised[idx + (i,)], data_denoised[idx + (i,)], sigma[idx + (i,)], N)
 
         nib.save(nib.Nifti1Image(data_denoised.astype(np.float32), affine, header), args.output)
         logger.info("Denoised data saved as {}".format(os.path.realpath(args.output)))

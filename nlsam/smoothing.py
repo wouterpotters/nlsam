@@ -297,3 +297,23 @@ def norm_shape(shape):
         pass
 
     raise TypeError('shape must be an int, or a tuple of ints')
+
+
+def local_noise_map_std(noise_map):
+
+    size = (3, 3, 3)
+    k = np.ones(size) / np.sum(np.ones(size))
+
+    mean_squared_noise = np.empty_like(noise_map, dtype=np.float32)
+    mean_noise = np.empty_like(noise_map, dtype=np.float32)
+
+    convolve(noise_map**2, k, mode='reflect', output=mean_squared_noise)
+    convolve(noise_map, k, mode='reflect', output=mean_noise)
+
+    # Variance = mean(x**2) - mean(x)**2
+    local_std = np.sqrt(mean_squared_noise - mean_noise**2)
+
+    fwhm = 10
+    blur = fwhm / np.sqrt(8 * np.log(2))
+
+    return gaussian_filter(local_std, blur, mode='reflect')

@@ -4,7 +4,7 @@ import numpy as np
 import warnings
 import logging
 
-from itertools import repeat, product, izip
+from itertools import repeat, product
 from time import time
 from multiprocessing import Pool
 
@@ -236,7 +236,7 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
     train_data /= np.sqrt(np.sum(train_data**2, axis=0, keepdims=True), dtype=np.float64)
 
     D = spams.trainDL(train_data, **param_D)
-    D /= np.sqrt(np.sum(D**2, axis=0, keepdims=True, dtype=dtype))
+    # D /= np.sqrt(np.sum(D**2, axis=0, keepdims=True, dtype=dtype))
     # param_D['D'] = param_alpha['D']
 
     del train_data, X
@@ -246,12 +246,12 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
 
     time_multi = time()
     pool = Pool(processes=n_cores)
-    overlap = True
-
-    if overlap:
-        ranger = range(data.shape[2] - block_size[2] + 1)
-    else:
-        ranger = range(0, data.shape[2], block_size[2])
+    # overlap = True
+    ranger = range(data.shape[2] - block_size[2] + 1)
+    # if overlap:
+    #     ranger = range(data.shape[2] - block_size[2] + 1)
+    # else:
+    #     ranger = range(0, data.shape[2], block_size[2])
 
     arglist = [(data[:, :, k:k + block_size[2]], mask[:, :, k:k + block_size[2]], variance[:, :, k:k + block_size[2]], block_size_subset, overlap_subset, D_subset, dtype_subset, n_iter_subset)
                for k, block_size_subset, overlap_subset, D_subset, dtype_subset, n_iter_subset
@@ -262,14 +262,14 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
                       repeat(dtype),
                       repeat(n_iter))]
 
-    data_denoised = map(processer, arglist)
+    data_denoised = pool.map(processer, arglist)
     pool.close()
     pool.join()
 
     # param_alpha['numThreads'] = n_cores
     # param_D['numThreads'] = n_cores
 
-    print('Multiprocessing done in {0:.2f} mins.'.format((time() - time_multi) / 60.))
+    logger.info('Multiprocessing done in {0:.2f} mins.'.format((time() - time_multi) / 60.))
 
     # Put together the multiprocessed results
     data_subset = np.zeros_like(data)
@@ -384,7 +384,7 @@ def _processer(data, mask, variance, block_size, overlap, D,
 
         weigths = None
 
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True, ols=False, weights=weights)
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=False, pos=True, standardize=False, ols=False, weights=weights)
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='aic')
 
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
