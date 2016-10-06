@@ -22,6 +22,7 @@ params['links'] = ['https://github.com/samuelstjean/spams-python/releases/downlo
 ###############################################
 
 import os
+import sys
 from os.path import join, exists, splitext
 
 # BEFORE importing distutils, remove MANIFEST. distutils doesn't properly
@@ -61,6 +62,11 @@ cython_gsl, have_cython_gsl, _ = optional_package("cython_gsl")
 if not have_cython_gsl:
     raise ImportError('cannot find gsl package (required for hyp1f1), \n'
                       'try pip install cythongsl and sudo apt-get install libgsl0-dev libgsl0ldbl')
+
+# If on window,s use bundled gsl for convenience
+
+if sys.platform == "win32":
+    os.environ['LIB_GSL'] = 'nlsam/gsl'
 
 # Check for local version of dipy if it exists, since it would replace a locally built
 # but not installed version.
