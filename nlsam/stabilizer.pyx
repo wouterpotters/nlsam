@@ -9,8 +9,10 @@ from multiprocessing import Pool, cpu_count
 import numpy as np
 cimport numpy as np
 
+from scipy.special.cython_special cimport ndtri
+from scipy.special.cython_special cimport ndtri
+
 from dipy.core.ndindex import ndindex
-from scipy.special import erfinv
 
 from nibabel.optpkg import optional_package
 cython_gsl, have_cython_gsl, _ = optional_package("cython_gsl")
@@ -86,6 +88,11 @@ cdef double hyp1f1(double a, int b, double x) nogil:
     return gsl_sf_hyperg_1F1(a, b, x)
 
 
+cdef double erfinv(double y) nogil:
+    '''Same as scipy.special.erfinv, but with nogil'''
+    return ndtri((y+1)/2.0)/sqrt(2)
+
+
 cdef double _inv_cdf_gauss(double y, double eta, double sigma) nogil:
     """Helper function for chi_to_gauss. Returns the gaussian distributed value
     associated to a given probability. See p. 4 of [1] eq. 13.
@@ -104,8 +111,7 @@ cdef double _inv_cdf_gauss(double y, double eta, double sigma) nogil:
     --------
         Value associated to probability y given a normal distribution N(eta, sigma**2)
     """
-    with gil:
-        return eta + sigma * sqrt(2) * erfinv(2*y - 1)
+    return eta + sigma * sqrt(2) * erfinv(2*y - 1)
 
 
 cdef double chi_to_gauss(double m, double eta, double sigma, int N,
