@@ -63,8 +63,7 @@ if not have_cython_gsl:
     raise ImportError('cannot find gsl package (required for hyp1f1), \n'
                       'try pip install cythongsl and sudo apt-get install libgsl0-dev libgsl0ldbl')
 
-# If on window,s use bundled gsl for convenience
-
+# If on windows, use bundled gsl for convenience
 if sys.platform == "win32":
     os.environ['LIB_GSL'] = 'nlsam/gsl'
 
