@@ -394,7 +394,7 @@ def _processer(data, mask, variance, block_size, overlap, D,
             continue
 
         # weigths = None
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=False, standardize=False)
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=False, standardize=True)
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='aic')
         # print(np.mean(X_out[:, i]), np.mean(X[idx]))
         # print('mean residuals', np.mean((X_out[:, i] - X[idx].ravel())**2))
