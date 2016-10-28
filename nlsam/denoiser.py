@@ -253,7 +253,14 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
     # else:
     #     ranger = range(0, data.shape[2], block_size[2])
 
-    arglist = [(data[:, :, k:k + block_size[2]], mask[:, :, k:k + block_size[2]], variance[:, :, k:k + block_size[2]], block_size_subset, overlap_subset, D_subset, dtype_subset, n_iter_subset)
+    arglist = [(data[:, :, k:k + block_size[2]],
+                mask[:, :, k:k + block_size[2]],
+                variance[:, :, k:k + block_size[2]],
+                block_size_subset,
+                overlap_subset,
+                D_subset,
+                dtype_subset,
+                n_iter_subset)
                for k, block_size_subset, overlap_subset, D_subset, dtype_subset, n_iter_subset
                in zip(ranger,
                       repeat(block_size),
@@ -324,27 +331,26 @@ def _processer(data, mask, variance, block_size, overlap, D,
     orig_shape = data.shape
     extraction_step = np.array([1, 1, 1, block_size[-1]])
 
-    no_overlap = False
-    mask_array = im2col_nd(mask, block_size[:-1], overlap[:-1])
-    train_idx = np.sum(mask_array, axis=0) > (mask_array.shape[0] / 2.)
+    # # no_overlap = False
+    # mask_array = im2col_nd(mask, block_size[:-1], overlap[:-1])
+    # train_idx = np.sum(mask_array, axis=0) > (mask_array.shape[0] / 2.)
 
-    # If mask is empty, return a bunch of zeros as blocks
-    if not np.any(train_idx):
-        return np.zeros_like(data)
+    # # If mask is empty, return a bunch of zeros as blocks
+    # if not np.any(train_idx):
+    #     return np.zeros_like(data)
 
-    X = im2col_nd(data, block_size, overlap)
-    var_mat = np.median(im2col_nd(variance, block_size[:-1], overlap[:-1])[:, train_idx], axis=0)
-    # X_full_shape = X.shape
-    X = X[:, train_idx]
+    # X = im2col_nd(data, block_size, overlap)
+    # var_mat = np.median(im2col_nd(variance, block_size[:-1], overlap[:-1])[:, train_idx], axis=0)
+    # # X_full_shape = X.shape
+    # X = X[:, train_idx]
 
-    if no_overlap:
-        overlap = (0, 0, 0, 0)
-        extraction_step = list(block_size)[:-1] + [1]
+    # if no_overlap:
+    #     overlap = (0, 0, 0, 0)
+    #     extraction_step = list(block_size)[:-1] + [1]
 
     # print(mask.shape, block_size[:-1],  extraction_step[:-1])
     mask_array = extract_patches(mask, block_size[:-1], extraction_step[:-1]).reshape((-1, np.prod(block_size[:-1]))).T
     # mask_array = im2col_nd(mask, block_size[:3], overlap[:3])
-
     train_idx = np.sum(mask_array, axis=0) > mask_array.shape[0] / 2
 
     # If mask is empty, return a bunch of zeros as blocks
@@ -353,7 +359,11 @@ def _processer(data, mask, variance, block_size, overlap, D,
 
     X = extract_patches(data, patch_shape=block_size, extraction_step=extraction_step)
     X_out = np.zeros((D.shape[0], train_idx.shape[0]), dtype=np.float32)
+    # weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
+    # print(X_out.shape, X.shape)
+    # print(X.reshape(-1, np.prod(block_size)).T.shape)
 
+    # return col2im_nd(X.reshape(-1, np.prod(block_size)).T, block_size, orig_shape, overlap, weigths)
     # var_mat = np.median(im2col_nd(variance[..., 0:orig_shape[-1]], block_size, overlap), axis=0).astype(np.float32)
     var_mat = None
     # X_full_shape = X.shape
@@ -361,19 +371,20 @@ def _processer(data, mask, variance, block_size, overlap, D,
     # var_mat = np.ones_like(var_mat)
     alpha = np.zeros((D.shape[1], X_out.shape[1]), dtype=np.float32)
 
-    def mystandardize(D):
-        S = np.std(D, axis=0, ddof=1)
-        M = np.mean(D, axis=0)
-        D_norm = (D - M) / S
-        return D_norm, M, S
+    # def mystandardize(D):
+    #     S = np.std(D, axis=0, ddof=1)
+    #     M = np.mean(D, axis=0)
+    #     D_norm = (D - M) / S
+    #     return D_norm, M, S
 
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
     nlam = 100
     Xhat = np.zeros((D.shape[0], nlam), dtype=np.float64)
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
     best = np.zeros(X_out.shape[1])
-    weights = np.ones(X_out.shape[0])
-
+    # weights = np.ones(X_out.shape[0])
+    # print(X.shape, mask_array.shape, train_idx.shape, np.sum(train_idx), X.reshape((-1, np.prod(block_size))).T.shape, X_out.shape)
+    # 1/0
     # Assume b/b0 for weights
     # iidx = np.prod(block_size[:-1])
 
@@ -382,29 +393,29 @@ def _processer(data, mask, variance, block_size, overlap, D,
         if not train_idx[i]:
             continue
 
-        weigths = None
-
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=False, pos=True, standardize=False, ols=False, weights=weights)
+        # weigths = None
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=False, standardize=False)
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='aic')
-
+        # print(np.mean(X_out[:, i]), np.mean(X[idx]))
+        # print('mean residuals', np.mean((X_out[:, i] - X[idx].ravel())**2))
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
 
-    if no_overlap:
-        out = np.zeros_like(data)
-        shaper = np.array(out.shape[:-1]) - np.array(block_size[:-1]) + 1
-        shaper = shaper[:-1]
+    # if no_overlap:
+    #     out = np.zeros_like(data)
+    #     shaper = np.array(out.shape[:-1]) - np.array(block_size[:-1]) + 1
+    #     shaper = shaper[:-1]
 
-        shaper = (range(0, out.shape[0], block_size[0]),
-                  range(0, out.shape[1], block_size[1]),
-                  range(0, out.shape[2], block_size[2]))
-        idx = 0
-        for i in shaper[0]:
-            for j in shaper[1]:
-                for k in shaper[2]:
+    #     shaper = (range(0, out.shape[0], block_size[0]),
+    #               range(0, out.shape[1], block_size[1]),
+    #               range(0, out.shape[2], block_size[2]))
+    #     idx = 0
+    #     for i in shaper[0]:
+    #         for j in shaper[1]:
+    #             for k in shaper[2]:
 
-                    out[i:i + block_size[0], j:j + block_size[1]] += X_out[:, idx].reshape(block_size)
-                    idx += 1
+    #                 out[i:i + block_size[0], j:j + block_size[1]] += X_out[:, idx].reshape(block_size)
+    #                 idx += 1
 
-        return out
+    #     return out
 
     return col2im_nd(X_out, block_size, orig_shape, overlap, weigths)

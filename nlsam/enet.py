@@ -12,53 +12,64 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     n_lambdas, intercepts, coefs, indices, nin, _, lambdas, _, jerr \
         = elastic_net(X, y, rho, **kwargs)
 
-    # Ordering from fortran starts at 1, so fix it to 0 for python
-    indices -= 1
+    # indices -= 1
 
     nlam = coefs.shape[1]
     reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float64)
     # reordered_coefs2 = np.zeros((X.shape[1], nlam), dtype=np.float64)
     # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
-
+    # print(coefs.shape, nin, coefs.shape, indices.shape)
+    # reordered_coefs = coefs[:nin]
+    # ind = indices[:nin] - 1
     for i in range(nlam):
         nval = nin[i]
-        ind = indices[:nval]
+        # Ordering from fortran starts at 1, so fix it to 0 for python
+        ind = indices[:nval] - 1
         reordered_coefs[ind, i] = coefs[:nval, i]
+        # reordered_coefs = coefs[:nval, i:i+1]
+    # X = X[:, ind]#.squeeze()
 
-    # reordered_coefs2[indices[:nin]] = coefs[:nin]
-    # print(np.sum(np.abs(reordered_coefs - reordered_coefs2)))
-    # print(reordered_coefs, reordered_coefs2)
-    # ols = True
-    if ols:
-        predict = np.zeros((X.shape[0], nlam))
+    # # reordered_coefs2[indices[:nin]] = coefs[:nin]
+    # # print(np.sum(np.abs(reordered_coefs - reordered_coefs2)))
+    # # print(reordered_coefs, reordered_coefs2)
+    # # ols = True
+    # if ols:
+    #     predict = np.zeros((X.shape[0], nlam))
 
-        # print(reordered_coefs.shape, X.shape, y.shape)
+    #     # print(reordered_coefs.shape, X.shape, y.shape)
 
-        for i in range(nlam):
-            idx = reordered_coefs[:, i] != 0
-            if np.sum(idx) > 0:
-                sol, _ = nnls(X[:, idx], y.ravel())
-                # sol = lstsq(X[:, idx], y.ravel())[0]
-                predict[:, i] = np.dot(X[:, idx], sol) + intercepts[i]
-    else:
-        predict = np.dot(X, reordered_coefs) + intercepts
-        # idx = reordered_coefs != 0
-        # p2 = np.dot(X[:, idx], reordered_coefs[idx]) + intercepts
-        # print(np.sum(np.abs(predict-p2)))
-    # print(np.sum(reordered_coefs != 0, axis=1), lambdas, coefs.shape[1], n_lambdas)
+    #     for i in range(nlam):
+    #         idx = reordered_coefs[:, i] != 0
+    #         if np.sum(idx) > 0:
+    #             sol, _ = nnls(X[:, idx], y.ravel())
+    #             # sol = lstsq(X[:, idx], y.ravel())[0]
+    #             predict[:, i] = np.dot(X[:, idx], sol) + intercepts[i]
+    # else:
+    #     predict = np.dot(X, reordered_coefs) + intercepts
+    #     # idx = reordered_coefs != 0
+    #     # p2 = np.dot(X[:, idx], reordered_coefs[idx]) + intercepts
+    #     # print(np.sum(np.abs(predict-p2)))
+    # # print(np.sum(reordered_coefs != 0, axis=1), lambdas, coefs.shape[1], n_lambdas)
+    # print(X.shape, reordered_coefs.shape, nlam, intercepts.shape)
+    # 1/0
+    # predict = np.dot(X, reordered_coefs) + intercepts
+    predict = np.dot(X, reordered_coefs) + intercepts
+    # print(predict.shape, reordered_coefs.shape, 'predict')
     return predict, reordered_coefs
 
 
 def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     '''See https://arxiv.org/pdf/0712.0881.pdf p. 9 eq. 2.15 and 2.16
-    X is D
-    y is X
-    beta is alpha
-    mu is X_hat = D * alpha
+
+    With regards to my notation :
+    X is D, the regressor/dictionary matrix
+    y is X, the measured signal we wish to reconstruct
+    beta is alpha, the coefficients
+    mu is the denoised reconstruction X_hat = D * alpha
     '''
 
     # y.shape(y.shape[0])
-    y = y.copy().ravel()
+    y = y.ravel()
     n = y.shape[0]
     p = X.shape[1]
 
@@ -71,7 +82,6 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     else:
         raise ValueError('Criterion {} is not supported!'.format(criterion))
 
-
     # mu = np.empty((X.shape[0],) + intercepts.shape, dtype=np.float32)
     # print(mu.shape, X.shape, y.shape, beta.shape, intercepts.shape, variance.shape)
     # print(X.shape, beta.shape, intercepts.shape)
@@ -80,14 +90,15 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     #     # print(i)
     #     mu[:, i] = np.dot(X, beta[i]) + intercepts[i]
 
-    # print(X.shape, y.shape, beta.shape, mu.shape, variance.shape)
+    # print(X.shape, y.shape, beta.shape, mu.shape)
+    # print(n,p)
     mse = np.mean((y[..., None] - mu)**2, axis=0) #, dtype=np.float32)
     df_mu = np.sum(beta != 0, axis=0) #, dtype=np.int32)
     # print(mse.shape, df_mu.shape, mu.shape, X.shape, y.shape)
     # 1/0
     # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, sse.shape, y.shape)
     # variance=None
-
+    variance=15**2
     # Use mse = SSE/n estimate for sample variance - we assume normally distributed
     # residuals though for the log-likelihood function...
     if variance is None:
@@ -101,7 +112,14 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # We don't want empty models
     criterion[df_mu == 0] = 1e300
     best_idx = np.argmin(criterion, axis=0)
-
+    # print(np.min(criterion))
+    # print(mu.shape, beta.shape)
+    # print(mu[:, best_idx].shape, beta[:, best_idx].shape)
+    # 1/0
+    # We can only estimate sigma squared after selecting the best model
+    estimated_variance = np.sum((y - mu[:, best_idx])**2) / (n - df_mu[best_idx])
+    # print(np.sqrt(estimated_variance))
+    # print(best_idx)
     return mu[:, best_idx], beta[:, best_idx], best_idx
 
 
@@ -110,7 +128,7 @@ def lasso_path(X, y, ols=False, **kwargs):
     return elastic_net_path(X, y, rho=1.0, ols=ols, **kwargs)
 
 
-def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
+def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None, copy=True,
                 standardize=False, nlam=100, maxit=10000, fit_intercept=False, **kwargs):
     """
     Raw-output wrapper for elastic net linear regression.
@@ -119,10 +137,13 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
     rho for lasso/elastic net tradeoff
     """
     # print(thr)
-    # X/y is overwritten in the fortran function at every loop, so we must copy it each time
-    X = np.array(X, copy=True, dtype=np.float64, order='F')
-    y = np.array(y.ravel(), copy=True, dtype=np.float64, order='F')
 
+    if copy:
+        # X/y is overwritten in the fortran function at every loop, so we must copy it each time
+        X = np.array(X, copy=True, dtype=np.float64, order='F')
+        y = y.flatten(order='F').astype(np.float64)  # flatten always copy
+    # X = np.copy(X)
+    # y = np.copy(y)
     # if y.ndim != 2:
     #     y.shape = (y.shape + (1,))
     # print(X.shape)
@@ -188,7 +209,8 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None,
     #     if not overwrite_pred_ok:
     #         # Might as well make it F-ordered to avoid ANOTHER copy.
     #         X = X.copy(order='F')
-
+    # ulam = 0.001
+    # nlam=None
     # y being a 1-dimensional array will usually be overwritten
     # with the standardized version unless we take steps to copy it.
     # if not overwrite_targ_ok:
