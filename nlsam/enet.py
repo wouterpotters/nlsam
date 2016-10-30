@@ -5,15 +5,56 @@ from scipy.sparse import csr_matrix
 from scipy.optimize import nnls
 from scipy.linalg import lstsq
 
+from glmnet import glmnet
+
+import warnings
+warnings.filterwarnings("ignore",category=DeprecationWarning)
+
 
 def elastic_net_path(X, y, rho, ols=False, **kwargs):
     """return full path for ElasticNet"""
 
-    n_lambdas, intercepts, coefs, indices, nin, _, lambdas, _, jerr \
-        = elastic_net(X, y, rho, **kwargs)
+    # n_lambdas, intercepts, coefs, indices, nin, _, lambdas, _, jerr \
+    #     = elastic_net(X, y, rho, **kwargs)
+    # from time import time
+    # t=time()
+    lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = elastic_net(X, y, rho, **kwargs)
+    # print('time2 was', time()-t)
+    # lmu=-1
+    # print(lmu, 'lmu', nin)#, a0.sum(), ca, ia, nin, rsq, alm, nlp, jerr)
+    # print(np.sum(X),np.sum(y),'sum1')
+    # clip the stuff
+    # lmu = n_lambdas
+    nvars = X.shape[1]
+    nx = X.shape[1] # nx was set before
+    a0 = a0[:lmu]
+    ca = ca[:nx, :lmu]
+    ia = ia[:nx]
+    nin = nin[:lmu]
+    rsq = rsq[:lmu]
+    alm = alm[:lmu]
+    # print(a0, 'a0sam')
+    ninmax = max(nin)
+
+    # if ninmax == 0:
+    #     return np.zeros((X.shape[0], lmu), dtype=np.float64), np.zeros([nvars, lmu], dtype=np.float64)
+
+    ca = ca[:ninmax, :]
+    # df = np.sum(ca != 0, axis=0)
+    ja = ia[:ninmax] - 1    # ia is 1-indexed in fortran
+    oja = np.argsort(ja)
+    ja1 = ja[oja]
+    # print(ia, ja, oja, ja1)
+    beta = np.zeros([nvars, lmu], dtype=np.float64)
+    beta[ja1, :] = ca[oja, :]
+    # print(np.sum(beta), 'beta', oja, ja1, ca, nx, lmu)
+    predict = np.zeros((X.shape[0], beta.shape[1]), dtype=np.float64)
+    predict[:] = np.dot(X, beta) + a0
+    return predict, beta
 
     # indices -= 1
-
+    # print(indices, len(indices), coefs.shape[1], nin)
+    # print(nin)
     nlam = coefs.shape[1]
     reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float64)
     # reordered_coefs2 = np.zeros((X.shape[1], nlam), dtype=np.float64)
@@ -28,7 +69,7 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
         reordered_coefs[ind, i] = coefs[:nval, i]
         # reordered_coefs = coefs[:nval, i:i+1]
     # X = X[:, ind]#.squeeze()
-
+    # ind = indices[:nval] - 1
     # # reordered_coefs2[indices[:nin]] = coefs[:nin]
     # # print(np.sum(np.abs(reordered_coefs - reordered_coefs2)))
     # # print(reordered_coefs, reordered_coefs2)
@@ -53,8 +94,12 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     # print(X.shape, reordered_coefs.shape, nlam, intercepts.shape)
     # 1/0
     # predict = np.dot(X, reordered_coefs) + intercepts
+    # predict = np.zeros((X.shape[0], n_lambdas))
     predict = np.dot(X, reordered_coefs) + intercepts
+    # predict = np.dot(X[:, ind], coefs) + intercepts
     # print(predict.shape, reordered_coefs.shape, 'predict')
+    # print(np.sum(predict, axis=0), np.sum(predict, axis=0).shape)
+    # print(predict[0])
     return predict, reordered_coefs
 
 
@@ -98,7 +143,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # 1/0
     # print(mu.shape, df_mu.shape, beta.shape, variance[...,None].shape, sse.shape, y.shape)
     # variance=None
-    variance=15**2
+    # variance=15**2
     # Use mse = SSE/n estimate for sample variance - we assume normally distributed
     # residuals though for the log-likelihood function...
     if variance is None:
@@ -123,21 +168,30 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     return mu[:, best_idx], beta[:, best_idx], best_idx
 
 
-def lasso_path(X, y, ols=False, **kwargs):
+def lasso_path(X, y, ols=False, nlambda=100, **kwargs):
     """return full path for Lasso"""
+
+    # fit = glmnet(x=X.copy(), y=y.flatten(), family='gaussian', alpha=1., nlambda=nlambda)
+    # from glmnet import ElasticNet
+    # m = ElasticNet()
+    # # print(X.shape, y.ravel().shape)
+    # y = y.ravel()
+    # m.fit(X, y)
+    # return m.predict(X)[:, None]#, m.coef_path_
     return elastic_net_path(X, y, rho=1.0, ols=ols, **kwargs)
 
 
-def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None, copy=True,
-                standardize=False, nlam=100, maxit=10000, fit_intercept=False, **kwargs):
+def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
+                standardize=True, nlam=100, maxit=1e5, fit_intercept=True, **kwargs):
     """
     Raw-output wrapper for elastic net linear regression.
     X is D
     y is X
     rho for lasso/elastic net tradeoff
     """
-    # print(thr)
 
+    # print(thr)
+    # print(pos, standardize, fit_intercept)
     if copy:
         # X/y is overwritten in the fortran function at every loop, so we must copy it each time
         X = np.array(X, copy=True, dtype=np.float64, order='F')
@@ -164,10 +218,10 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None, copy=Tru
     # maxit = 1000
 
     box_constraints = np.zeros((2, X.shape[1]), order='F')
-    box_constraints[1] = 1e300
+    box_constraints[1] = 9.9e35 # this is a large number in fortran
 
     if not pos:
-        box_constraints[0] = -1e300
+        box_constraints[0] = -9.9e35
 
     for keyword in kwargs:
         # if keyword == 'overwrite_pred_ok':
@@ -230,7 +284,19 @@ def elastic_net(X, y, rho, pos=True, thr=1.0e-4, weights=None, vp=None, copy=Tru
 
     # Call the Fortran wrapper.
     nx = X.shape[1]
-
+    # ulam = 0.1
+    # nlam=None
+    # Trick from official wrapper
+    if X.shape[0] < X.shape[1]:
+        flmin = 0.01
+    else:
+        flmin = 1e-4
+    # print(len([rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
+    # print(([rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
+    # print(np.sum(X),np.sum(y),'sum1')
+    # print(np.sum(X), np.sum(y),np.sum(weights),np.sum(jd),np.sum(vp),np.sum(box_constraints),np.sum(nx),np.sum(flmin),ulam,thr)
+    # print(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
+              # nlam, standardize, maxit, fit_intercept)
     lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
         elnet(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
               nlam=nlam, isd=standardize, maxit=maxit, intr=fit_intercept)

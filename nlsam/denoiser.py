@@ -4,9 +4,9 @@ import numpy as np
 import warnings
 import logging
 
-from itertools import repeat, product
+from itertools import repeat, product, starmap
 from time import time
-from multiprocessing import Pool
+from multiprocessing import Pool, get_context
 
 from dipy.core.ndindex import ndindex
 
@@ -245,7 +245,12 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
     # param_D['numThreads'] = 1
 
     time_multi = time()
-    pool = Pool(processes=n_cores)
+
+    try:
+        pool = get_context(method='forkserver').Pool(processes=n_cores)
+    except ValueError:
+        pool = Pool(processes=n_cores)
+
     # overlap = True
     ranger = range(data.shape[2] - block_size[2] + 1)
     # if overlap:
@@ -378,6 +383,10 @@ def _processer(data, mask, variance, block_size, overlap, D,
     #     return D_norm, M, S
 
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
+    from glmnet import glmnet
+    # from glmnetCoef import glmnetCoef
+    # from glmnetPredict import glmnetPredict
+
     nlam = 100
     Xhat = np.zeros((D.shape[0], nlam), dtype=np.float64)
     alphas = np.zeros((D.shape[1], nlam), dtype=np.float64)
@@ -393,11 +402,36 @@ def _processer(data, mask, variance, block_size, overlap, D,
         if not train_idx[i]:
             continue
 
-        # weigths = None
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=False, standardize=True)
-        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='aic')
-        # print(np.mean(X_out[:, i]), np.mean(X[idx]))
-        # print('mean residuals', np.mean((X_out[:, i] - X[idx].ravel())**2))
+        fit = glmnet(x=D.copy(), y=X[idx].flatten(), family='gaussian', alpha=1., nlambda=nlam)
+        # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
+        predict = np.dot(D, fit['beta']) + fit['a0']
+        # print(fit['a0'], 'a0glmnet')
+        alphas[:, :fit['beta'].shape[1]] = fit['beta']
+        alphas[:, fit['beta'].shape[1]:] = 0.
+
+        Xhat[:, :predict.shape[1]] = predict
+        Xhat[:, predict.shape[1]:] = 0.
+
+        X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
+
+        # a, b = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
+        # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
+        # print(np.sum(fit['beta']), np.sum(b), 'sums stuff')
+
+        # print(np.sum(np.abs(a-Xhat)), np.sum(np.abs(b-alphas)))
+        # print(a[0], a[0].shape, 'a0')
+        # print(Xhat[0], Xhat[0].shape, 'xhat')
+        # print(a.shape, b.shape, Xhat.shape, alphas.shape)
+        # print(np.sum(b),np.sum(alphas),np.sum(fit['beta']), 'sums')
+        # print(b[0], b[0].shape, 'b0')
+        # print(alphas[0], alphas[0].shape, 'alphas')
+
+        # 1/0
+        # # weigths = None
+        # Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
+        # X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
+        # # print(np.mean(X_out[:, i]), np.mean(X[idx]))
+        # # print('mean residuals', np.mean((X_out[:, i] - X[idx].ravel())**2), best[i])
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
 
     # if no_overlap:
