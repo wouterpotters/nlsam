@@ -1,11 +1,11 @@
 import numpy as np
-from _glmnet import elnet, modval, uncomp, solns, fishnet
+from _glmnet import elnet, solns #,modval, uncomp, , fishnet
 # import _glmnet
 from scipy.sparse import csr_matrix
 from scipy.optimize import nnls
 from scipy.linalg import lstsq
 
-from glmnet import glmnet
+# from glmnet import glmnet
 
 import warnings
 warnings.filterwarnings("ignore",category=DeprecationWarning)
@@ -26,28 +26,33 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     # clip the stuff
     # lmu = n_lambdas
     nvars = X.shape[1]
-    nx = X.shape[1] # nx was set before
+    nx = X.shape[1] + 1 # nx was set before
     a0 = a0[:lmu]
     ca = ca[:nx, :lmu]
     ia = ia[:nx]
     nin = nin[:lmu]
     rsq = rsq[:lmu]
     alm = alm[:lmu]
+
+    if len(alm) > 2:
+        lambda_0 = np.exp(2 * np.log(alm[1]) - np.log(alm[2]))
+        alm[0] = lambda_0
     # print(a0, 'a0sam')
     ninmax = max(nin)
 
-    # if ninmax == 0:
-    #     return np.zeros((X.shape[0], lmu), dtype=np.float64), np.zeros([nvars, lmu], dtype=np.float64)
+    beta = solns(X.shape[1], ca, ia, nin)
+    # # if ninmax == 0:
+    # #     return np.zeros((X.shape[0], lmu), dtype=np.float64), np.zeros([nvars, lmu], dtype=np.float64)
 
-    ca = ca[:ninmax, :]
-    # df = np.sum(ca != 0, axis=0)
-    ja = ia[:ninmax] - 1    # ia is 1-indexed in fortran
-    oja = np.argsort(ja)
-    ja1 = ja[oja]
-    # print(ia, ja, oja, ja1)
-    beta = np.zeros([nvars, lmu], dtype=np.float64)
-    beta[ja1, :] = ca[oja, :]
-    # print(np.sum(beta), 'beta', oja, ja1, ca, nx, lmu)
+    # ca = ca[:ninmax, :]
+    # # df = np.sum(ca != 0, axis=0)
+    # ja = ia[:ninmax] - 1    # ia is 1-indexed in fortran
+    # oja = np.argsort(ja)
+    # ja1 = ja[oja]
+    # # print(ia, ja, oja, ja1)
+    # beta = np.zeros([nvars, lmu], dtype=np.float64)
+    # beta[ja1, :] = ca[oja, :]
+    # # print(np.sum(beta), 'beta', oja, ja1, ca, nx, lmu)
     predict = np.zeros((X.shape[0], beta.shape[1]), dtype=np.float64)
     predict[:] = np.dot(X, beta) + a0
     return predict, beta
@@ -283,23 +288,32 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
         vp = vp.copy()
 
     # Call the Fortran wrapper.
-    nx = X.shape[1]
+    nx = X.shape[1] + 1
     # ulam = 0.1
     # nlam=None
     # Trick from official wrapper
     if X.shape[0] < X.shape[1]:
         flmin = 0.01
+        algo_flag = 2
     else:
         flmin = 1e-4
+        algo_flag = 1
+
+    # ulam=None
+    # print(X.shape, y.shape, weights.shape, jd,vp.shape, box_constraints.shape, nx, flmin, ulam, thr)
+    # print(thr, len([algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
     # print(len([rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
     # print(([rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
     # print(np.sum(X),np.sum(y),'sum1')
     # print(np.sum(X), np.sum(y),np.sum(weights),np.sum(jd),np.sum(vp),np.sum(box_constraints),np.sum(nx),np.sum(flmin),ulam,thr)
     # print(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
               # nlam, standardize, maxit, fit_intercept)
+    # lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
+    #     elnet(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
+    #           nlam=nlam, isd=standardize, maxit=maxit, intr=fit_intercept)
     lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
-        elnet(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
-              nlam=nlam, isd=standardize, maxit=maxit, intr=fit_intercept)
+        elnet(algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr, nx-1,
+              nlam, standardize, fit_intercept, maxit)
 
     return lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr
 

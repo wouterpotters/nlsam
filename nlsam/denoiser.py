@@ -4,7 +4,7 @@ import numpy as np
 import warnings
 import logging
 
-from itertools import repeat, product, starmap
+from itertools import repeat, product
 from time import time
 from multiprocessing import Pool, get_context
 
@@ -25,6 +25,8 @@ from skimage.util.shape import view_as_windows, view_as_blocks
 # from sklearn.linear_model import Lasso
 # from nlsam.utils import im2col_nd, col2im_nd
 from nlsam.angular_tools import angular_neighbors
+
+from glmnet import glmnet
 
 # from scipy.sparse import lil_matrix
 
@@ -383,7 +385,7 @@ def _processer(data, mask, variance, block_size, overlap, D,
     #     return D_norm, M, S
 
     # lambdas = np.logspace(np.log10(lambda_max * eps), np.log10(lambda_max), num=nlam)[::-1]
-    from glmnet import glmnet
+
     # from glmnetCoef import glmnetCoef
     # from glmnetPredict import glmnetPredict
 
