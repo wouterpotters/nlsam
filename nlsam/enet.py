@@ -167,7 +167,11 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # print(mu[:, best_idx].shape, beta[:, best_idx].shape)
     # 1/0
     # We can only estimate sigma squared after selecting the best model
-    estimated_variance = np.sum((y - mu[:, best_idx])**2) / (n - df_mu[best_idx])
+
+    if n > df_mu[best_idx]:
+        estimated_variance = np.sum((y - mu[:, best_idx])**2) / (n - df_mu[best_idx])
+    else:
+        estimated_variance = 0
     # print(np.sqrt(estimated_variance))
     # print(best_idx)
     return mu[:, best_idx], beta[:, best_idx], best_idx
