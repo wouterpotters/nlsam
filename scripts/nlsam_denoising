@@ -230,8 +230,8 @@ def main():
     else:
         mask = np.ones(data.shape[:-1], dtype=np.bool)
 
-    data = data[:, 85:95]
-    mask = mask[:, 85:95]
+    data = data[:, 70:95]
+    mask = mask[:, 70:95]
 
     bvals, bvecs = read_bvals_bvecs(args.bvals, args.bvecs)
     gtab = gradient_table(bvals, bvecs, b0_threshold=b0_threshold)

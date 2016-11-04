@@ -6,7 +6,12 @@ import logging
 
 from itertools import repeat, product
 from time import time
-from multiprocessing import Pool, get_context
+from multiprocessing import Pool
+
+try:
+    from multiprocessing import get_context
+except ImportError:
+    pass
 
 from dipy.core.ndindex import ndindex
 
@@ -404,7 +409,10 @@ def _processer(data, mask, variance, block_size, overlap, D,
         if not train_idx[i]:
             continue
 
+        # t=time()
         fit = glmnet(x=D.copy(), y=X[idx].flatten(), family='gaussian', alpha=1., nlambda=nlam)
+        # print(time()-t)
+        # t=time()
         # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
         predict = np.dot(D, fit['beta']) + fit['a0']
         # print(fit['a0'], 'a0glmnet')
@@ -413,10 +421,14 @@ def _processer(data, mask, variance, block_size, overlap, D,
 
         Xhat[:, :predict.shape[1]] = predict
         Xhat[:, predict.shape[1]:] = 0.
+        # print(time()-t)
 
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
 
+        # t=time()
         # a, b = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
+        # print(time()-t)
+        # 1/0
         # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
         # print(np.sum(fit['beta']), np.sum(b), 'sums stuff')
 
@@ -430,8 +442,11 @@ def _processer(data, mask, variance, block_size, overlap, D,
 
         # 1/0
         # # weigths = None
+        # t=time()
         # Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
         # X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
+        # print(time()-t)
+        # 1/0
         # # print(np.mean(X_out[:, i]), np.mean(X[idx]))
         # # print('mean residuals', np.mean((X_out[:, i] - X[idx].ravel())**2), best[i])
     weigths = np.ones(X_out.shape[1], dtype=dtype, order='F')
