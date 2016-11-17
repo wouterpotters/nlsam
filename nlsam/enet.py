@@ -8,7 +8,7 @@ from scipy.linalg import lstsq
 # from glmnet import glmnet
 
 import warnings
-warnings.filterwarnings("ignore",category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 def elastic_net_path(X, y, rho, ols=False, **kwargs):
@@ -19,14 +19,9 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     # from time import time
     # t=time()
     lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = elastic_net(X, y, rho, **kwargs)
-    # print('time2 was', time()-t)
-    # lmu=-1
-    # print(lmu, 'lmu', nin)#, a0.sum(), ca, ia, nin, rsq, alm, nlp, jerr)
-    # print(np.sum(X),np.sum(y),'sum1')
-    # clip the stuff
-    # lmu = n_lambdas
-    nvars = X.shape[1]
-    nx = X.shape[1] + 1 # nx was set before
+
+    nobs, nx = X.shape
+
     a0 = a0[:lmu]
     ca = ca[:nx, :lmu]
     ia = ia[:nx]
@@ -34,13 +29,50 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     rsq = rsq[:lmu]
     alm = alm[:lmu]
 
-    if len(alm) > 2:
-        lambda_0 = np.exp(2 * np.log(alm[1]) - np.log(alm[2]))
-        alm[0] = lambda_0
-    # print(a0, 'a0sam')
     ninmax = max(nin)
 
-    beta = solns(X.shape[1], ca, ia, nin)
+    if ninmax == 0:
+        return np.zeros((nobs, lmu), dtype=np.float64), np.zeros([nx, lmu], dtype=np.float64)
+
+    ca = ca[:ninmax]
+    df = np.sum(ca != 0, axis=0)
+    ja = ia[:ninmax] - 1    # ia is 1-indexed in fortran
+    oja = np.argsort(ja)
+    ja1 = ja[oja]
+    beta = np.zeros([nx, lmu], dtype=np.float64)
+    beta[ja1] = ca[oja]
+
+    # predict = np.zeros((X.shape[0], beta.shape[1]), dtype=np.float64)
+    # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0[:lmu]
+    predict = np.dot(X, beta) + a0
+
+    return predict, beta
+
+    # print('time2 was', time()-t)
+    # lmu=-1
+    # print(lmu, 'lmu', nin)#, a0.sum(), ca, ia, nin, rsq, alm, nlp, jerr)
+    # print(np.sum(X),np.sum(y),'sum1')
+    # clip the stuff
+    # lmu = n_lambdas
+    # nvars = X.shape[1]
+    # nx = X.shape[1] + 1 # nx was set before
+    # a0 = a0[:lmu]
+    # ca = ca[:nx, :lmu]
+    # ia = ia[:nx]
+    # nin = nin[:lmu]
+    # rsq = rsq[:lmu]
+    # alm = alm[:lmu]
+
+    # if len(alm) > 2:
+    #     lambda_0 = np.exp(2 * np.log(alm[1]) - np.log(alm[2]))
+    #     alm[0] = lambda_0
+    # # print(a0, 'a0sam')
+    # ninmax = max(nin)
+
+    # beta = solns(X.shape[1], ca, ia, nin)
+    # beta = np.zeros([n_lambdas, X.shape[1]], dtype=np.float64)
+    # print(beta.shape)
+    # beta = solns(intercepts, indices, nin, beta)
     # # if ninmax == 0:
     # #     return np.zeros((X.shape[0], lmu), dtype=np.float64), np.zeros([nvars, lmu], dtype=np.float64)
 
@@ -53,9 +85,9 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     # beta = np.zeros([nvars, lmu], dtype=np.float64)
     # beta[ja1, :] = ca[oja, :]
     # # print(np.sum(beta), 'beta', oja, ja1, ca, nx, lmu)
-    predict = np.zeros((X.shape[0], beta.shape[1]), dtype=np.float64)
-    predict[:] = np.dot(X, beta) + a0
-    return predict, beta
+    # predict = np.zeros((X.shape[0], beta.shape[1]), dtype=np.float64)
+    # predict[:] = np.dot(X, beta) + intercepts
+    # return predict, beta
 
     # indices -= 1
     # print(indices, len(indices), coefs.shape[1], nin)
@@ -162,18 +194,13 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # We don't want empty models
     criterion[df_mu == 0] = 1e300
     best_idx = np.argmin(criterion, axis=0)
-    # print(np.min(criterion))
-    # print(mu.shape, beta.shape)
-    # print(mu[:, best_idx].shape, beta[:, best_idx].shape)
-    # 1/0
-    # We can only estimate sigma squared after selecting the best model
 
+    # We can only estimate sigma squared after selecting the best model
     if n > df_mu[best_idx]:
         estimated_variance = np.sum((y - mu[:, best_idx])**2) / (n - df_mu[best_idx])
     else:
         estimated_variance = 0
-    # print(np.sqrt(estimated_variance))
-    # print(best_idx)
+
     return mu[:, best_idx], beta[:, best_idx], best_idx
 
 
@@ -298,10 +325,10 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     # Trick from official wrapper
     if X.shape[0] < X.shape[1]:
         flmin = 0.01
-        algo_flag = 2
+        # algo_flag = 2
     else:
         flmin = 1e-4
-        algo_flag = 1
+        # algo_flag = 1
 
     # ulam=None
     # print(X.shape, y.shape, weights.shape, jd,vp.shape, box_constraints.shape, nx, flmin, ulam, thr)
@@ -312,12 +339,26 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     # print(np.sum(X), np.sum(y),np.sum(weights),np.sum(jd),np.sum(vp),np.sum(box_constraints),np.sum(nx),np.sum(flmin),ulam,thr)
     # print(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
               # nlam, standardize, maxit, fit_intercept)
+    # print(X.shape, y.shape, weights.shape, jd.shape, vp.shape, box_constraints.shape, nx, flmin, ulam, thr)
+
+    lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = elnet(rho,
+                                                      X,
+                                                      y,
+                                                      weights,
+                                                      jd,
+                                                      vp,
+                                                      box_constraints,
+                                                      nx,
+                                                      flmin,
+                                                      ulam,
+                                                      thr,
+                                                      nlam=nlam,
+                                                      isd=standardize,
+                                                      maxit=maxit,
+                                                      intr=fit_intercept)
     # lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
-    #     elnet(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
-    #           nlam=nlam, isd=standardize, maxit=maxit, intr=fit_intercept)
-    lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
-        elnet(algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr, nx-1,
-              nlam, standardize, fit_intercept, maxit)
+    #     elnet(algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr, nx-1,
+    #           nlam, standardize, fit_intercept, maxit)
 
     return lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr
 

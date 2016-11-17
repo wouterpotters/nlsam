@@ -257,7 +257,7 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
         pool = get_context(method='forkserver').Pool(processes=n_cores)
     except ValueError:
         pool = Pool(processes=n_cores)
-
+    # pool = Pool(processes=n_cores)
     # overlap = True
     ranger = range(data.shape[2] - block_size[2] + 1)
     # if overlap:
@@ -281,6 +281,7 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
                       repeat(dtype),
                       repeat(n_iter))]
 
+    # data_denoised = list(map(processer, arglist))
     data_denoised = pool.map(processer, arglist)
     pool.close()
     pool.join()
@@ -404,47 +405,38 @@ def _processer(data, mask, variance, block_size, overlap, D,
     # Assume b/b0 for weights
     # iidx = np.prod(block_size[:-1])
 
+    # t=time()
+    # X = X.reshape(np.prod(block_size), -1)
+    # print(time() - t)
+    # print(X.shape, D.shape)
+    # # 1/0
+    # for i in range(X.shape[1]):
+    #     fit = glmnet(x=D, y=X[:, i], family='gaussian', alpha=1., nlambda=nlam)
+    # print(time() - t)
+    # 1/0
     for i, idx in enumerate(ndindex(X.shape[:X.ndim // 2])):
 
         if not train_idx[i]:
             continue
 
         # t=time()
-        fit = glmnet(x=D.copy(), y=X[idx].flatten(), family='gaussian', alpha=1., nlambda=nlam)
-        # print(time()-t)
+        # fit = glmnet(x=D.copy(), y=X[idx].flatten(), family='gaussian', alpha=1., nlambda=nlam)
+        # # fit = glmnet(x=D.copy(), y=X[idx].flatten(), family='mgaussian', alpha=1., nlambda=nlam)
+        # # print(time()-t)
+        # # t=time()
+        # # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
+        # predict = np.dot(D, fit['beta']) + fit['a0']
+        # # print(fit['a0'], 'a0glmnet')
+        # alphas[:, :fit['beta'].shape[1]] = fit['beta']
+        # alphas[:, fit['beta'].shape[1]:] = 0.
+
+        # Xhat[:, :predict.shape[1]] = predict
+        # Xhat[:, predict.shape[1]:] = 0.
+
         # t=time()
-        # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
-        predict = np.dot(D, fit['beta']) + fit['a0']
-        # print(fit['a0'], 'a0glmnet')
-        alphas[:, :fit['beta'].shape[1]] = fit['beta']
-        alphas[:, fit['beta'].shape[1]:] = 0.
-
-        Xhat[:, :predict.shape[1]] = predict
-        Xhat[:, predict.shape[1]:] = 0.
-        # print(time()-t)
-
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=False, standardize=True)
+        # print('done', time()-t)
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
-
-        # t=time()
-        # a, b = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
-        # print(time()-t)
-        # 1/0
-        # print(np.sum(D.copy()), np.sum(X[idx].flatten()), 'sum1')
-        # print(np.sum(fit['beta']), np.sum(b), 'sums stuff')
-
-        # print(np.sum(np.abs(a-Xhat)), np.sum(np.abs(b-alphas)))
-        # print(a[0], a[0].shape, 'a0')
-        # print(Xhat[0], Xhat[0].shape, 'xhat')
-        # print(a.shape, b.shape, Xhat.shape, alphas.shape)
-        # print(np.sum(b),np.sum(alphas),np.sum(fit['beta']), 'sums')
-        # print(b[0], b[0].shape, 'b0')
-        # print(alphas[0], alphas[0].shape, 'alphas')
-
-        # 1/0
-        # # weigths = None
-        # t=time()
-        # Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
-        # X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
         # print(time()-t)
         # 1/0
         # # print(np.mean(X_out[:, i]), np.mean(X[idx]))
