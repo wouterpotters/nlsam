@@ -11,7 +11,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def elastic_net_path(X, y, rho, ols=False, **kwargs):
+def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     """return full path for ElasticNet"""
 
     # n_lambdas, intercepts, coefs, indices, nin, _, lambdas, _, jerr \
@@ -58,11 +58,11 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
 
 
 
-    predict = np.zeros((X.shape[0], 100), dtype=np.float64)
+    predict = np.zeros((X.shape[0], nlam), dtype=np.float64)
     # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0
     predict[:, :lmu] = np.dot(X, beta) + a0
     # print(X.shape, predict.shape, beta.shape, a0.shape)
-    out = np.zeros([nx, 100], dtype=np.float64)
+    out = np.zeros([nx, nlam], dtype=np.float64)
     out[:, :lmu] = beta
     return predict, out
 
@@ -222,7 +222,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     return mu[:, best_idx], beta[:, best_idx], best_idx
 
 
-def lasso_path(X, y, ols=False, nlambda=100, **kwargs):
+def lasso_path(X, y, ols=False, nlam=100, **kwargs):
     """return full path for Lasso"""
 
     # fit = glmnet(x=X.copy(), y=y.flatten(), family='gaussian', alpha=1., nlambda=nlambda)
@@ -232,7 +232,7 @@ def lasso_path(X, y, ols=False, nlambda=100, **kwargs):
     # y = y.ravel()
     # m.fit(X, y)
     # return m.predict(X)[:, None]#, m.coef_path_
-    return elastic_net_path(X, y, rho=1.0, ols=ols, **kwargs)
+    return elastic_net_path(X, y, rho=1.0, ols=ols, nlam=nlam, **kwargs)
 
 
 def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
@@ -249,7 +249,7 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     if copy:
         # X/y is overwritten in the fortran function at every loop, so we must copy it each time
         X = np.array(X, copy=True, dtype=np.float64, order='F')
-        y = np.array(y.ravel(), copy=True, order='F', dtype=np.float64)
+        y = np.array(y, copy=True, dtype=np.float64, order='F').ravel()
 
     # X = np.copy(X)
     # y = np.copy(y)
@@ -268,7 +268,7 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     # isd = True              # Standardize input variables before proceeding?
     jd = np.zeros(1)        # X to exclude altogether from fitting
     ulam = None             # User-specified lambda values
-    flmin = 0.001  # Fraction of largest lambda at which to stop
+    # flmin = 0.001  # Fraction of largest lambda at which to stop
     # nlam = 100    # The (maximum) number of lambdas to try.
     # maxit = 1000
 
@@ -278,38 +278,38 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     if not pos:
         box_constraints[0] = -9.9e35
 
-    for keyword in kwargs:
-        # if keyword == 'overwrite_pred_ok':
-        #     overwrite_pred_ok = kwargs[keyword]
-        # elif keyword == 'overwrite_targ_ok':
-        #     overwrite_targ_ok = kwargs[keyword]
-        # if keyword == 'threshold':
-        #     thr = kwargs[keyword]
-        # elif keyword == 'weights':
-        #     weights = np.asarray(kwargs[keyword]).copy()
-        # elif keyword == 'penalties':
-        #     vp = kwargs[keyword].copy()
-        # elif keyword == 'standardize':
-        #     isd = bool(kwargs[keyword])
-        if keyword == 'exclude':
-            # Add one since Fortran indices start at 1
-            exclude = (np.asarray(kwargs[keyword]) + 1).tolist()
-            jd = np.array([len(exclude)] + exclude)
-        elif keyword == 'lambdas':
-            if 'flmin' in kwargs:
-                raise ValueError("Can't specify both lambdas & flmin keywords")
-            ulam = np.asarray(kwargs[keyword])
-            flmin = 2.  # Pass flmin > 1.0 indicating to use the user-supplied.
-            nlam = len(ulam)
-        elif keyword == 'flmin':
-            flmin = kwargs[keyword]
-            ulam = None
-        elif keyword == 'nlam':
-            if 'lambdas' in kwargs:
-                raise ValueError("Can't specify both lambdas & nlam keywords")
-            nlam = kwargs[keyword]
-        else:
-            raise ValueError("Unknown keyword argument '%s'" % keyword)
+    # for keyword in kwargs:
+    #     # if keyword == 'overwrite_pred_ok':
+    #     #     overwrite_pred_ok = kwargs[keyword]
+    #     # elif keyword == 'overwrite_targ_ok':
+    #     #     overwrite_targ_ok = kwargs[keyword]
+    #     # if keyword == 'threshold':
+    #     #     thr = kwargs[keyword]
+    #     # elif keyword == 'weights':
+    #     #     weights = np.asarray(kwargs[keyword]).copy()
+    #     # elif keyword == 'penalties':
+    #     #     vp = kwargs[keyword].copy()
+    #     # elif keyword == 'standardize':
+    #     #     isd = bool(kwargs[keyword])
+    #     if keyword == 'exclude':
+    #         # Add one since Fortran indices start at 1
+    #         exclude = (np.asarray(kwargs[keyword]) + 1).tolist()
+    #         jd = np.array([len(exclude)] + exclude)
+    #     elif keyword == 'lambdas':
+    #         if 'flmin' in kwargs:
+    #             raise ValueError("Can't specify both lambdas & flmin keywords")
+    #         ulam = np.asarray(kwargs[keyword])
+    #         flmin = 2.  # Pass flmin > 1.0 indicating to use the user-supplied.
+    #         nlam = len(ulam)
+    #     elif keyword == 'flmin':
+    #         flmin = kwargs[keyword]
+    #         ulam = None
+    #     elif keyword == 'nlam':
+    #         if 'lambdas' in kwargs:
+    #             raise ValueError("Can't specify both lambdas & nlam keywords")
+    #         nlam = kwargs[keyword]
+    #     else:
+    #         raise ValueError("Unknown keyword argument '%s'" % keyword)
 
     # # If X is a Fortran contiguous array, it will be overwritten.
     # # Decide whether we want this. If it's not Fortran contiguous it will
@@ -368,8 +368,8 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
                                                       vp,
                                                       box_constraints,
                                                       nx,
-                                                      1e-2,
-                                                      None,
+                                                      flmin,
+                                                      ulam,
                                                       thr,
                                                       nlam=nlam,
                                                       isd=standardize,
