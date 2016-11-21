@@ -434,7 +434,7 @@ def _processer(data, mask, variance, block_size, overlap, D,
         # Xhat[:, predict.shape[1]:] = 0.
 
         # t=time()
-        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=False, standardize=True)
+        Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
         # print('done', time()-t)
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
         # print(time()-t)

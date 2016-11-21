@@ -37,16 +37,34 @@ def elastic_net_path(X, y, rho, ols=False, **kwargs):
     ca = ca[:ninmax]
     df = np.sum(ca != 0, axis=0)
     ja = ia[:ninmax] - 1    # ia is 1-indexed in fortran
+    # ja = ia - 1    # ia is 1-indexed in fortran
     oja = np.argsort(ja)
     ja1 = ja[oja]
     beta = np.zeros([nx, lmu], dtype=np.float64)
+    # print(beta.shape, ca.shape, ja1.shape, ca.shape, ia.shape, ja.shape, nx, lmu)
+    # 1/0
+    # print(ja1)
+    # print(oja)
+    # 1/0
     beta[ja1] = ca[oja]
 
-    # predict = np.zeros((X.shape[0], beta.shape[1]), dtype=np.float64)
-    # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0[:lmu]
-    predict = np.dot(X, beta) + a0
+        # predict = np.dot(D, fit['beta']) + fit['a0']
+        # # print(fit['a0'], 'a0glmnet')
+        # alphas[:, :fit['beta'].shape[1]] = fit['beta']
+        # alphas[:, fit['beta'].shape[1]:] = 0.
 
-    return predict, beta
+        # Xhat[:, :predict.shape[1]] = predict
+        # Xhat[:, predict.shape[1]:] = 0.
+
+
+
+    predict = np.zeros((X.shape[0], 100), dtype=np.float64)
+    # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0
+    predict[:, :lmu] = np.dot(X, beta) + a0
+    # print(X.shape, predict.shape, beta.shape, a0.shape)
+    out = np.zeros([nx, 100], dtype=np.float64)
+    out[:, :lmu] = beta
+    return predict, out
 
     # print('time2 was', time()-t)
     # lmu=-1
@@ -231,7 +249,8 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     if copy:
         # X/y is overwritten in the fortran function at every loop, so we must copy it each time
         X = np.array(X, copy=True, dtype=np.float64, order='F')
-        y = y.flatten(order='F').astype(np.float64)  # flatten always copy
+        y = np.array(y.ravel(), copy=True, order='F', dtype=np.float64)
+
     # X = np.copy(X)
     # y = np.copy(y)
     # if y.ndim != 2:
@@ -319,7 +338,7 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
         vp = vp.copy()
 
     # Call the Fortran wrapper.
-    nx = X.shape[1] + 1
+    nx = X.shape[1] #+ 1
     # ulam = 0.1
     # nlam=None
     # Trick from official wrapper
@@ -349,8 +368,8 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
                                                       vp,
                                                       box_constraints,
                                                       nx,
-                                                      flmin,
-                                                      ulam,
+                                                      1e-2,
+                                                      None,
                                                       thr,
                                                       nlam=nlam,
                                                       isd=standardize,
