@@ -32,7 +32,7 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     ninmax = max(nin)
 
     if ninmax == 0:
-        return np.zeros((nobs, lmu), dtype=np.float64), np.zeros([nx, lmu], dtype=np.float64)
+        return np.zeros((nobs, nlam), dtype=np.float64), np.zeros([nx, nlam], dtype=np.float64)
 
     ca = ca[:ninmax]
     df = np.sum(ca != 0, axis=0)
@@ -41,22 +41,7 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     oja = np.argsort(ja)
     ja1 = ja[oja]
     beta = np.zeros([nx, lmu], dtype=np.float64)
-    # print(beta.shape, ca.shape, ja1.shape, ca.shape, ia.shape, ja.shape, nx, lmu)
-    # 1/0
-    # print(ja1)
-    # print(oja)
-    # 1/0
     beta[ja1] = ca[oja]
-
-        # predict = np.dot(D, fit['beta']) + fit['a0']
-        # # print(fit['a0'], 'a0glmnet')
-        # alphas[:, :fit['beta'].shape[1]] = fit['beta']
-        # alphas[:, fit['beta'].shape[1]:] = 0.
-
-        # Xhat[:, :predict.shape[1]] = predict
-        # Xhat[:, predict.shape[1]:] = 0.
-
-
 
     predict = np.zeros((X.shape[0], nlam), dtype=np.float64)
     # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0
