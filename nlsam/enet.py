@@ -6,7 +6,7 @@ from scipy.optimize import nnls
 from scipy.linalg import lstsq
 
 from time import time
-# from glmnet import glmnet
+from glmnet import glmnet
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
