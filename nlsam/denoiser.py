@@ -214,6 +214,9 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
     if mask is None:
         mask = np.ones(data.shape[:-1], dtype=np.bool)
 
+
+    use_fancy_stuff = True
+
     patch_shape = block_size
     extraction_step = list(block_size)[:-1] + [1]
     # extraction_step=1
@@ -435,7 +438,7 @@ def _processer(data, mask, variance, block_size, overlap, D,
 
         # t=time()
         Xhat[:], alphas[:] = lasso_path(D, X[idx], nlam=nlam, fit_intercept=True, pos=True, standardize=True)
-        # print('done', time()-t)
+
         X_out[:, i], alpha[:, i], best[i] = select_best_path(D, X[idx], alphas, Xhat, var_mat, criterion='bic')
         # print(time()-t)
         # 1/0

@@ -5,21 +5,27 @@ from scipy.sparse import csr_matrix
 from scipy.optimize import nnls
 from scipy.linalg import lstsq
 
+from time import time
 # from glmnet import glmnet
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
+def elastic_net_path(X, y, rho, ols=False, nlam=100, fit_intercept=False, pos=False, standardize=False):
     """return full path for ElasticNet"""
 
     # n_lambdas, intercepts, coefs, indices, nin, _, lambdas, _, jerr \
     #     = elastic_net(X, y, rho, **kwargs)
     # from time import time
     # t=time()
-    lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = elastic_net(X, y, rho, **kwargs)
-
+    # print(nlam, fit_intercept, pos, standardize, 'in path')
+    lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = elastic_net(X, y, rho,
+                                                            nlam=nlam,
+                                                            fit_intercept=fit_intercept,
+                                                            pos=pos,
+                                                            standardize=standardize)
+    # print(nlam, 'in path')
     nobs, nx = X.shape
 
     a0 = a0[:lmu]
@@ -29,11 +35,20 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     rsq = rsq[:lmu]
     alm = alm[:lmu]
 
-    ninmax = max(nin)
+    # print(nin)
+    # print(lmu)
+    # print(rsq)
+    # print(a0)
+    # print(jerr)
+
+    if len(nin) == 0:
+        ninmax = 0
+    else:
+        ninmax = max(nin)
 
     if ninmax == 0:
         return np.zeros((nobs, nlam), dtype=np.float64), np.zeros([nx, nlam], dtype=np.float64)
-
+    # print(ninmax)
     ca = ca[:ninmax]
     df = np.sum(ca != 0, axis=0)
     ja = ia[:ninmax] - 1    # ia is 1-indexed in fortran
@@ -42,14 +57,15 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     ja1 = ja[oja]
     beta = np.zeros([nx, lmu], dtype=np.float64)
     beta[ja1] = ca[oja]
-
-    predict = np.zeros((X.shape[0], nlam), dtype=np.float64)
-    # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0
-    predict[:, :lmu] = np.dot(X, beta) + a0
-    # print(X.shape, predict.shape, beta.shape, a0.shape)
-    out = np.zeros([nx, nlam], dtype=np.float64)
-    out[:, :lmu] = beta
-    return predict, out
+    # beta = ca[oja]
+    return beta
+    # predict = np.zeros((X.shape[0], nlam), dtype=np.float64)
+    # # predict[:, :lmu] = np.dot(X, beta[:, :lmu]) + a0
+    # predict[:, :lmu] = np.dot(X, beta) + a0
+    # # print(X.shape, predict.shape, beta.shape, a0.shape)
+    # out = np.zeros([nx, nlam], dtype=np.float64)
+    # out[:, :lmu] = beta
+    # return predict, out
 
     # print('time2 was', time()-t)
     # lmu=-1
@@ -95,19 +111,19 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     # indices -= 1
     # print(indices, len(indices), coefs.shape[1], nin)
     # print(nin)
-    nlam = coefs.shape[1]
-    reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float64)
-    # reordered_coefs2 = np.zeros((X.shape[1], nlam), dtype=np.float64)
-    # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
-    # print(coefs.shape, nin, coefs.shape, indices.shape)
-    # reordered_coefs = coefs[:nin]
-    # ind = indices[:nin] - 1
-    for i in range(nlam):
-        nval = nin[i]
-        # Ordering from fortran starts at 1, so fix it to 0 for python
-        ind = indices[:nval] - 1
-        reordered_coefs[ind, i] = coefs[:nval, i]
-        # reordered_coefs = coefs[:nval, i:i+1]
+    # nlam = coefs.shape[1]
+    # reordered_coefs = np.zeros((X.shape[1], nlam), dtype=np.float64)
+    # # reordered_coefs2 = np.zeros((X.shape[1], nlam), dtype=np.float64)
+    # # predict = np.zeros((X.shape[0], nlam), dtype=np.float32)
+    # # print(coefs.shape, nin, coefs.shape, indices.shape)
+    # # reordered_coefs = coefs[:nin]
+    # # ind = indices[:nin] - 1
+    # for i in range(nlam):
+    #     nval = nin[i]
+    #     # Ordering from fortran starts at 1, so fix it to 0 for python
+    #     ind = indices[:nval] - 1
+    #     reordered_coefs[ind, i] = coefs[:nval, i]
+    #     # reordered_coefs = coefs[:nval, i:i+1]
     # X = X[:, ind]#.squeeze()
     # ind = indices[:nval] - 1
     # # reordered_coefs2[indices[:nin]] = coefs[:nin]
@@ -135,12 +151,12 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, **kwargs):
     # 1/0
     # predict = np.dot(X, reordered_coefs) + intercepts
     # predict = np.zeros((X.shape[0], n_lambdas))
-    predict = np.dot(X, reordered_coefs) + intercepts
-    # predict = np.dot(X[:, ind], coefs) + intercepts
-    # print(predict.shape, reordered_coefs.shape, 'predict')
-    # print(np.sum(predict, axis=0), np.sum(predict, axis=0).shape)
-    # print(predict[0])
-    return predict, reordered_coefs
+    # predict = np.dot(X, reordered_coefs) + intercepts
+    # # predict = np.dot(X[:, ind], coefs) + intercepts
+    # # print(predict.shape, reordered_coefs.shape, 'predict')
+    # # print(np.sum(predict, axis=0), np.sum(predict, axis=0).shape)
+    # # print(predict[0])
+    # return predict, reordered_coefs
 
 
 def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
@@ -167,6 +183,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     else:
         raise ValueError('Criterion {} is not supported!'.format(criterion))
 
+    # print(X.shape, y.shape, beta.shape, mu.shape)
     # mu = np.empty((X.shape[0],) + intercepts.shape, dtype=np.float32)
     # print(mu.shape, X.shape, y.shape, beta.shape, intercepts.shape, variance.shape)
     # print(X.shape, beta.shape, intercepts.shape)
@@ -178,6 +195,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # print(X.shape, y.shape, beta.shape, mu.shape)
     # print(n,p)
     mse = np.mean((y[..., None] - mu)**2, axis=0) #, dtype=np.float32)
+    rss = np.sum((y[..., None] - mu)**2, axis=0) #, dtype=np.float32)
     df_mu = np.sum(beta != 0, axis=0) #, dtype=np.int32)
     # print(mse.shape, df_mu.shape, mu.shape, X.shape, y.shape)
     # 1/0
@@ -188,16 +206,24 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     # residuals though for the log-likelihood function...
     if variance is None:
         criterion = n * np.log(mse) + df_mu * w
+        # criterion = df_mu * w - 2 * np.log(rss)
         # s2 = sse / n
         # log_L = np.log(1 / np.sqrt(2 * np.pi * s2)) * n - sse / (2 * s2)
         # criterion = w * df_mu - 2 * log_L
     else:
-        criterion = (mse / variance) + (w * df_mu / n)
+        # criterion = (mse / variance) + (w * df_mu / n)
+        criterion = rss / (n * variance) + (2 * df_mu / n)
+        # aic = 2*df_mu - 2*np.log(mse)
+        # criterion = aic  + (2 * (df_mu + 1) * (df_mu + 2)) / (n - df_mu - 2)
 
     # We don't want empty models
     criterion[df_mu == 0] = 1e300
     best_idx = np.argmin(criterion, axis=0)
-
+    # print(mse.shape, df_mu.shape, criterion.shape, best_idx)
+    # print(mse)
+    # print(df_mu)
+    # print(criterion)
+    # 1/0
     # We can only estimate sigma squared after selecting the best model
     if n > df_mu[best_idx]:
         estimated_variance = np.sum((y - mu[:, best_idx])**2) / (n - df_mu[best_idx])
@@ -207,7 +233,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
     return mu[:, best_idx], beta[:, best_idx], best_idx
 
 
-def lasso_path(X, y, ols=False, nlam=100, **kwargs):
+def lasso_path(X, y, ols=False, nlam=100, fit_intercept=False, pos=False, standardize=False):
     """return full path for Lasso"""
 
     # fit = glmnet(x=X.copy(), y=y.flatten(), family='gaussian', alpha=1., nlambda=nlambda)
@@ -217,11 +243,13 @@ def lasso_path(X, y, ols=False, nlam=100, **kwargs):
     # y = y.ravel()
     # m.fit(X, y)
     # return m.predict(X)[:, None]#, m.coef_path_
-    return elastic_net_path(X, y, rho=1.0, ols=ols, nlam=nlam, **kwargs)
+    # print(nlam, 'upper')
+    # print(nlam, fit_intercept, pos, standardize, 'upper')
+    return elastic_net_path(X, y, rho=1.0, ols=ols, nlam=nlam, fit_intercept=fit_intercept, pos=pos, standardize=standardize)
 
 
-def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
-                standardize=True, nlam=100, maxit=1e5, fit_intercept=True, **kwargs):
+def elastic_net(X, y, rho, pos=False, thr=1e-4, weights=None, vp=None, copy=True,
+                standardize=False, nlam=100, maxit=1e5, fit_intercept=False):
     """
     Raw-output wrapper for elastic net linear regression.
     X is D
@@ -253,6 +281,7 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     # isd = True              # Standardize input variables before proceeding?
     jd = np.zeros(1)        # X to exclude altogether from fitting
     ulam = None             # User-specified lambda values
+    # ulam=0.01
     # flmin = 0.001  # Fraction of largest lambda at which to stop
     # nlam = 100    # The (maximum) number of lambdas to try.
     # maxit = 1000
@@ -323,7 +352,7 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
         vp = vp.copy()
 
     # Call the Fortran wrapper.
-    nx = X.shape[1] #+ 1
+    nx = X.shape[1] + 1
     # ulam = 0.1
     # nlam=None
     # Trick from official wrapper
@@ -333,8 +362,14 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     else:
         flmin = 1e-4
         # algo_flag = 1
-
+    # flmin = 1e-8
+    # ulam = 1/len(y)
+    # ulam=1e-7
     # ulam=None
+    # flmin = None
+    # ulam = np.linspace(100, 1, num=100)
+    # ulam = 1e-7
+    # nlam=None
     # print(X.shape, y.shape, weights.shape, jd,vp.shape, box_constraints.shape, nx, flmin, ulam, thr)
     # print(thr, len([algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
     # print(len([rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr]))
@@ -344,7 +379,8 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
     # print(rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr,
               # nlam, standardize, maxit, fit_intercept)
     # print(X.shape, y.shape, weights.shape, jd.shape, vp.shape, box_constraints.shape, nx, flmin, ulam, thr)
-
+    # tt = time()
+    # print(nlam, 'inner', standardize, fit_intercept)
     lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = elnet(rho,
                                                       X,
                                                       y,
@@ -360,6 +396,9 @@ def elastic_net(X, y, rho, pos=True, thr=1e-4, weights=None, vp=None, copy=True,
                                                       isd=standardize,
                                                       maxit=maxit,
                                                       intr=fit_intercept)
+    # print(nlam, 'inner')
+    # 1/0
+    # print('time in glmnet {}', time() - tt)
     # lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
     #     elnet(algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr, nx-1,
     #           nlam, standardize, fit_intercept, maxit)
