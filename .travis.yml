@@ -14,7 +14,7 @@ addons:
       - libgsl0-dev
       - libgsl0ldbl
       - gfortran
-      - gunzip
+     # - gunzip
 
 env:
     global:
@@ -26,20 +26,27 @@ python:
   - 2.7
   - 3.4
   - 3.5
+  - 3.6
 
 matrix:
   include:
-    # To test minimum dependencies
     - python: 2.7
       env:
         - DEPENDS="nomkl numpy==1.10.4 cython==0.21"
         - DEPENDS_CONDA='nibabel==2.0.1 dipy==0.11"
         - DEPENDS_PIP="cythongsl==0.2.1 scipy==0.14"
-
+    - python: 3.4
+      env:
+        - DEPENDS="nomkl numpy==1.10.4 cython==0.21"
+        - DEPENDS_CONDA='nibabel==2.0.1 dipy==0.11"
+        - DEPENDS_PIP="cythongsl==0.2.1 scipy==0.14"
+        
 notifications:
     email: false
 
 before_install:
+    # no py36 conda build for dipy yet
+    - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then DEPENDS_CONDA='nibabel' DEPENDS_PIP="cythongsl dipy"; fi;
     - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
     - bash miniconda.sh -b -p $HOME/miniconda
     - export PATH="$HOME/miniconda/bin:$PATH"
