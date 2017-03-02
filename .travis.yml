@@ -18,7 +18,7 @@ addons:
 
 env:
     global:
-        - DEPENDS="cython numpy scipy"
+        - DEPENDS="nomkl cython numpy scipy"
         - DEPENDS_CONDA='dipy nibabel'
         - DEPENDS_PIP="cythongsl"
 
@@ -46,7 +46,7 @@ notifications:
 
 before_install:
     # no py36 conda build for dipy yet
-    - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then DEPENDS_CONDA='nibabel' DEPENDS_PIP="cythongsl dipy"; fi;
+    - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then DEPENDS='numpy>=1.12 cython' DEPENDS_CONDA='nibabel' DEPENDS_PIP="cythongsl dipy"; fi;
     - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
     - bash miniconda.sh -b -p $HOME/miniconda
     - export PATH="$HOME/miniconda/bin:$PATH"
