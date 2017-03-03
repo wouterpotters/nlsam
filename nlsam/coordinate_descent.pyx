@@ -125,7 +125,7 @@ cdef double[:] enet_coordinate_descent_gram(double[:] w, double alpha, double be
                                  double[:, :] Q,
                                  double[:] q,
                                  double[:] y,
-                                 int max_iter=500, double tol=1e-4, bint positive=1):
+                                 int max_iter=500, double tol=1e-4, bint positive=1) nogil:
     """Cython version of the coordinate descent algorithm
         for Elastic-Net regression
 

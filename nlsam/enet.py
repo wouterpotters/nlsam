@@ -7,6 +7,7 @@ from scipy.linalg import lstsq
 
 from time import time
 # from glmnet import glmnet
+from numba import jit
 
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -32,8 +33,8 @@ def elastic_net_path(X, y, rho, ols=False, nlam=100, fit_intercept=False, pos=Fa
     ca = ca[:nx, :lmu]
     ia = ia[:nx]
     nin = nin[:lmu]
-    rsq = rsq[:lmu]
-    alm = alm[:lmu]
+    # rsq = rsq[:lmu]
+    # alm = alm[:lmu]
 
     # print(nin)
     # print(lmu)
@@ -212,7 +213,7 @@ def select_best_path(X, y, beta, mu, variance=None, criterion='aic'):
         # criterion = w * df_mu - 2 * log_L
     else:
         # criterion = (mse / variance) + (w * df_mu / n)
-        criterion = rss / (n * variance) + (2 * df_mu / n)
+        criterion = rss / (n * variance) + (w * df_mu / n)
         # aic = 2*df_mu - 2*np.log(mse)
         # criterion = aic  + (2 * (df_mu + 1) * (df_mu + 2)) / (n - df_mu - 2)
 
@@ -398,13 +399,65 @@ def elastic_net(X, y, rho, pos=False, thr=1e-4, weights=None, vp=None, copy=True
                                                       intr=fit_intercept)
     # print(nlam, 'inner')
     # 1/0
-    # print('time in glmnet {}', time() - tt)
+    # print('time in glmnet', time() - tt, X.shape, y.shape)
     # lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr = \
     #     elnet(algo_flag, rho, X, y, weights, jd, vp, box_constraints, nx, flmin, ulam, thr, nx-1,
     #           nlam, standardize, fit_intercept, maxit)
 
     return lmu, a0, ca, ia, nin, rsq, alm, nlp, jerr
 
+
+def threading_elnet(X, y, rho, pos=False, thr=1e-4, weights=None, vp=None,
+                    standardize=False, nlam=100, maxit=1e5, fit_intercept=False):
+
+    jd = np.zeros(1)        # X to exclude altogether from fitting
+    ulam = None             # User-specified lambda values
+
+    box_constraints = np.zeros((2, X.shape[1]), order='F')
+    box_constraints[1] = 9.9e35 # this is a large number in fortran
+
+    if not pos:
+        box_constraints[0] = -9.9e35
+
+    # Uniform weighting if no weights are specified.
+    if weights is None:
+        weights = np.ones(X.shape[0], order='F')
+    else:
+        weights = np.array(weights, copy=True, order='F')
+
+    # Uniform penalties if none were specified.
+    if vp is None:
+        vp = np.ones(X.shape[1], order='F')
+    else:
+        vp = vp.copy()
+
+    # Call the Fortran wrapper.
+    nx = X.shape[1] + 1
+
+    # Trick from official wrapper
+    if X.shape[0] < X.shape[1]:
+        flmin = 0.01
+    else:
+        flmin = 1e-4
+
+    # preassign stuff before the size varying loop
+    for i in range(y.shape[0]):
+        lmu, a0, ca, ia, nin, _, _, _, _ = elnet(rho,
+                                                 np.asfortranarray(X, copy=True),
+                                                 np.asfortranarray(y[i]).ravel(),
+                                                 weights,
+                                                 jd,
+                                                 vp,
+                                                 box_constraints,
+                                                 nx,
+                                                 flmin,
+                                                 ulam,
+                                                 thr,
+                                                 nlam=nlam,
+                                                 isd=standardize,
+                                                 maxit=maxit,
+                                                 intr=fit_intercept)
+    return lmu, a0, ca, ia, nin, _, _, _, _
 
 # This part stolen from
 # https://github.com/ceholden/glmnet-python/blob/master/glmnet/utils.py
