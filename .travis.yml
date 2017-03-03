@@ -32,14 +32,14 @@ matrix:
   include:
     - python: 2.7
       env:
-        - DEPENDS="numpy==1.10.4 cython==0.21"
-        - DEPENDS_CONDA=""
-        - DEPENDS_PIP="cythongsl==0.2.1 scipy==0.14 nibabel==2.0.1 dipy==0.11"
+        - DEPENDS="cython==0.21"
+        - DEPENDS_CONDA="-h"
+        - DEPENDS_PIP="numpy==1.10.4 cythongsl==0.2.1 scipy==0.14 nibabel==2.0.1 dipy==0.11"
     - python: 3.4
       env:
-        - DEPENDS="numpy==1.10.4 cython==0.21"
-        - DEPENDS_CONDA="
-        - DEPENDS_PIP="cythongsl==0.2.1 scipy==0.14 nibabel==2.0.1 dipy==0.11"
+        - DEPENDS="cython==0.21"
+        - DEPENDS_CONDA="-h"
+        - DEPENDS_PIP="numpy==1.10.4 cythongsl==0.2.1 scipy==0.14 nibabel==2.0.1 dipy==0.11"
 
 notifications:
     email: false
