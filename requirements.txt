@@ -1,4 +1,4 @@
-numpy>=1.10.4
+numpy>=1.10.4, !=1.12 # numpy 1.12 has a bug in fortran ordering
 scipy>=0.14
 cython>=0.21
 nibabel>=2.0
