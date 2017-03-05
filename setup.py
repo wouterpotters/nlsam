@@ -10,7 +10,7 @@ params['author_email'] = 'samuel@isi.uu.nl'
 params['url'] = 'https://github.com/samuelstjean/nlsam'
 params['version'] = '0.5.1'
 params['requires'] = ['cythongsl>=0.2.1',
-                      'numpy>=1.10.4, !=1.12.0',  # numpy 1.12 has a bug in fortran ordering
+                      'numpy>=1.10.4', 'numpy!=1.12.0',  # numpy 1.12 has a bug in fortran ordering
                       'cython>=0.21']
 params['deps'] = ['scipy>=0.14',
                   'nibabel>=2.0',
