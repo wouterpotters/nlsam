@@ -210,6 +210,8 @@ def local_denoise(data, block_size, overlap, variance, n_iter=10, mask=None,
     param_D['K'] = int(2 * np.prod(block_size))
     param_D['iter'] = 150
     param_D['batchsize'] = 500
+    # this workarounds a deprecation in numpy 1.12, same as passing D = None to spams
+    param_D['D'] = np.array([[], []], dtype=np.float64, order="F") 
 
     if 'D' in param_alpha:
         param_D['D'] = param_alpha['D']
