@@ -63,7 +63,7 @@ before_install:
 install:
    # - conda config --add channels conda-forge
    # - conda install $DEPENDS_CONDA
-   - pip install $DEPENDS
+    - pip install $DEPENDS
     - pip install $DEPENDS_PIP
     - python setup.py build_ext -i
     - python setup.py install
