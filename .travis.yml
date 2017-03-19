@@ -18,7 +18,7 @@ addons:
 
 env:
     global:
-        - DEPENDS="nomkl cython numpy scipy"
+        - DEPENDS="cython numpy scipy"
         - DEPENDS_PIP="cythongsl dipy nibabel"
 
 python:
@@ -31,12 +31,12 @@ matrix:
   include:
     - python: 2.7
       env:
-        - DEPENDS="cython==0.21"
-        - DEPENDS_PIP="numpy==1.10.4 cythongsl==0.2.1 scipy==0.14 nibabel==2.0.1 dipy==0.11"
+        - DEPENDS="cython==0.21 numpy==1.10.4 scipy==0.14"
+        - DEPENDS_PIP="cythongsl==0.2.1 nibabel==2.0.1 dipy==0.11"
     - python: 3.4
       env:
-        - DEPENDS="cython==0.21"
-        - DEPENDS_PIP="numpy==1.10.4 cythongsl==0.2.1 scipy==0.14 nibabel==2.0.1 dipy==0.11"
+        - DEPENDS="cython==0.21 numpy==1.10.4 scipy==0.14"
+        - DEPENDS_PIP="cythongsl==0.2.1 nibabel==2.0.1 dipy==0.11"
 
 notifications:
     email: false
@@ -62,6 +62,7 @@ before_install:
 install:
    # - conda config --add channels conda-forge
    # - conda install $DEPENDS_CONDA
+   - pip install $DEPENDS
     - pip install $DEPENDS_PIP
     - python setup.py build_ext -i
     - python setup.py install
