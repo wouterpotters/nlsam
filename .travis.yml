@@ -55,6 +55,7 @@ before_install:
 #    - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION $DEPENDS pip
 #    - source activate test-environment
     - python --version # just to check
+    - pip install --upgrade --user pip # so that we can use wheels
     - pip install nose coverage coveralls
 #    - source deactivate
 #    - source activate test-environment
